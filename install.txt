@@ -1,0 +1,56 @@
+OPENCART EASYPACK24 INTEGRATION
+-------------------------------
+
+1. Download latest version of OpenCart from:
+	http://www.opencart.com/index.php?route=download/download
+
+   Integration was prepared and tested on version v1.5.5.1.
+
+2. Install OpenCart according to the provided instruction:
+	http://docs.opencart.com/display/opencart/Installation
+
+3. Add Easypack24 database columns (e.g. mysql -u opencart -p opencart):
+
+	ALTER TABLE order ADD easypack24_parcel_id VARCHAR (50) AFTER shipping_code;
+	ALTER TABLE order ADD easypack24_status VARCHAR (50) AFTER easypack24_parcel_id;
+
+   If you have set prefix for database tables change "order" to "prefix_order".
+
+4. Copy files from install directory to your OpenCart installation path:
+
+	cp -R ./install/* /your/opencart/path/
+
+5. Apply diff patch to your OpenCart installation:
+
+	cd /your/opencart/path
+	patch -p1 < opencart.patch
+
+6. Enable InPost Parcel Lockers 24/7 in admin panel:
+
+	go to http://www.your.host/admin
+   	log in and go to Extensions->Shipping
+	click "Install" on InPost Parcel Lockers 24/7
+	when it's done - click "Edit"
+	provide API url and key and other configuration fields
+	set status to Enabled
+	
+	Configuration fields:
+		Api url (e.g. http://api.easypack24.net/)
+		Api key
+		Price (e.g. 14)
+		Max weight (e.g. 25)
+		Max dimension - size A (width x height x depth, e.g. 8x38x64)
+		Max dimension - size B (e.g. 19x38x64)
+		Max dimension - size C (e.g. 41x38x64)	
+		
+    For managing parcels go to Sales -> InPost Parcel Lockers 24/7.
+		
+	In order to access Sales -> InPost Parcel Lockers 24/7 menu item,
+	you have to set permissions for your admin user. Go to System ->
+	Users -> User Groups, click "Edit" on Top Administrator user group.
+	For access permission and modify permission set "sale/easypack24_order"
+	and click "Save".
+
+7. Verify integration is working by going to checkout in OpenCart shop.
+
+	

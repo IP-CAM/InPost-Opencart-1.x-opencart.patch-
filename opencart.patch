@@ -1,0 +1,363 @@
+diff -rupN opencart-base-backup/admin/controller/common/header.php opencart-base-patched-backup/admin/controller/common/header.php
+--- opencart-base-backup/admin/controller/common/header.php	2013-03-18 14:54:53.102900532 +0100
++++ opencart-base-patched-backup/admin/controller/common/header.php	2013-03-18 15:10:16.706912635 +0100
+@@ -41,6 +41,7 @@ class ControllerCommonHeader extends Con
+ 		$this->data['text_design'] = $this->language->get('text_design');
+ 		$this->data['text_documentation'] = $this->language->get('text_documentation');
+ 		$this->data['text_download'] = $this->language->get('text_download');
++        $this->data['text_easypack24_order'] = $this->language->get('text_easypack24_order');
+ 		$this->data['text_error_log'] = $this->language->get('text_error_log');
+ 		$this->data['text_extension'] = $this->language->get('text_extension');
+ 		$this->data['text_feed'] = $this->language->get('text_feed');
+@@ -126,6 +127,7 @@ class ControllerCommonHeader extends Con
+ 			$this->data['customer_ban_ip'] = $this->url->link('sale/customer_ban_ip', 'token=' . $this->session->data['token'], 'SSL');
+ 			$this->data['custom_field'] = $this->url->link('design/custom_field', 'token=' . $this->session->data['token'], 'SSL');
+ 			$this->data['download'] = $this->url->link('catalog/download', 'token=' . $this->session->data['token'], 'SSL');
++            $this->data['easypack24_order'] = $this->url->link('sale/easypack24_order', 'token=' . $this->session->data['token'], 'SSL');
+ 			$this->data['error_log'] = $this->url->link('tool/error_log', 'token=' . $this->session->data['token'], 'SSL');
+ 			$this->data['feed'] = $this->url->link('extension/feed', 'token=' . $this->session->data['token'], 'SSL');	
+ 			$this->data['filter'] = $this->url->link('catalog/filter', 'token=' . $this->session->data['token'], 'SSL');			
+diff -rupN opencart-base-backup/admin/index.php opencart-base-patched-backup/admin/index.php
+--- opencart-base-backup/admin/index.php	2013-03-18 14:54:53.102900532 +0100
++++ opencart-base-patched-backup/admin/index.php	2013-03-18 15:10:16.706912635 +0100
+@@ -138,7 +138,10 @@ $registry->set('length', new Length($reg
+ 
+ // User
+ $registry->set('user', new User($registry));
+-						
++
++// Easypack24 Helper
++$registry->set('easypack24_helper', new Easypack24HelperData($registry));
++
+ // Front Controller
+ $controller = new Front($registry);
+ 
+diff -rupN opencart-base-backup/admin/language/english/common/header.php opencart-base-patched-backup/admin/language/english/common/header.php
+--- opencart-base-backup/admin/language/english/common/header.php	2013-03-18 14:54:53.110900531 +0100
++++ opencart-base-patched-backup/admin/language/english/common/header.php	2013-03-18 15:10:16.710912635 +0100
+@@ -21,6 +21,7 @@ $_['text_custom_field']                =
+ $_['text_dashboard']                   = 'Dashboard';
+ $_['text_design']                      = 'Design';
+ $_['text_download']                    = 'Downloads';
++$_['text_easypack24_order']            = 'InPost Parcel Lockers 24/7';
+ $_['text_error_log']                   = 'Error Logs';
+ $_['text_extension']                   = 'Extensions';
+ $_['text_feed']                        = 'Product Feeds';
+diff -rupN opencart-base-backup/admin/view/template/common/header.tpl opencart-base-patched-backup/admin/view/template/common/header.tpl
+--- opencart-base-backup/admin/view/template/common/header.tpl	2013-03-18 14:54:53.114900533 +0100
++++ opencart-base-patched-backup/admin/view/template/common/header.tpl	2013-03-18 15:10:16.718912635 +0100
+@@ -94,6 +94,7 @@ $(document).ready(function(){
+       <li id="sale"><a class="top"><?php echo $text_sale; ?></a>
+         <ul>
+           <li><a href="<?php echo $order; ?>"><?php echo $text_order; ?></a></li>
++          <li><a href="<?php echo $easypack24_order; ?>"><?php echo $text_easypack24_order; ?></a></li>
+           <li><a href="<?php echo $return; ?>"><?php echo $text_return; ?></a></li>
+           <li><a class="parent"><?php echo $text_customer; ?></a>
+             <ul>
+diff -rupN opencart-base-backup/catalog/controller/checkout/confirm.php opencart-base-patched-backup/catalog/controller/checkout/confirm.php
+--- opencart-base-backup/catalog/controller/checkout/confirm.php	2013-03-18 14:54:53.150900534 +0100
++++ opencart-base-patched-backup/catalog/controller/checkout/confirm.php	2013-03-18 15:10:16.750912635 +0100
+@@ -198,7 +198,20 @@ class ControllerCheckoutConfirm extends
+ 					$data['shipping_code'] = $this->session->data['shipping_method']['code'];
+ 				} else {
+ 					$data['shipping_code'] = '';
+-				}				
++				}
++
++                if ($this->session->data['shipping_method']['code'] == 'easypack24.easypack24') {
++                    $data['shipping_company'] = '';
++                    $data['shipping_address_1'] = $this->session->data['easypack24_shipping_address_1'];
++                    $data['shipping_address_2'] = $this->session->data['easypack24_shipping_address_2'];
++                    $data['shipping_city'] = $this->session->data['easypack24_shipping_city'];
++                    $data['shipping_postcode'] = $this->session->data['easypack24_shipping_postcode'];
++                    $data['shipping_zone'] = '';
++                    $data['shipping_zone_id'] = '';
++                    $data['shipping_country'] = '';
++                    $data['shipping_country_id'] = '';
++                    $data['shipping_address_format'] = '';
++                }
+ 			} else {
+ 				$data['shipping_firstname'] = '';
+ 				$data['shipping_lastname'] = '';	
+diff -rupN opencart-base-backup/catalog/controller/checkout/shipping_method.php opencart-base-patched-backup/catalog/controller/checkout/shipping_method.php
+--- opencart-base-backup/catalog/controller/checkout/shipping_method.php	2013-03-18 14:54:53.150900534 +0100
++++ opencart-base-patched-backup/catalog/controller/checkout/shipping_method.php	2013-03-18 15:51:04.578944706 +0100
+@@ -75,6 +75,8 @@ class ControllerCheckoutShippingMethod e
+ 		} else {
+ 			$this->data['comment'] = '';
+ 		}
++
++        $this->prepareDataForEasypack24();
+ 			
+ 		if (file_exists(DIR_TEMPLATE . $this->config->get('config_template') . '/template/checkout/shipping_method.tpl')) {
+ 			$this->template = $this->config->get('config_template') . '/template/checkout/shipping_method.tpl';
+@@ -84,8 +86,68 @@ class ControllerCheckoutShippingMethod e
+ 		
+ 		$this->response->setOutput($this->render());
+   	}
+-	
+-	public function validate() {
++
++    public function prepareDataForEasypack24()
++    {
++        $allMachines = $this->easypack24_helper->connectEasypack24(
++            array(
++                'url' => $this->config->get('easypack24_api_url') . 'machines',
++                'methodType' => 'GET',
++                'params' => array()
++            )
++        );
++
++        if (empty($this->session->data['shipping_address_id'])) {
++            $city = $this->session->data['guest']['shipping']['city'];
++            $phone = $this->session->data['guest']['telephone'];
++        } else {
++            $city = $this->model_account_address->getAddress($this->session->data['shipping_address_id'])['city'];
++            $phone = $this->customer->getTelephone();
++        }
++
++        $resultMachines = array();
++        $resultMachinesDetails = array();
++        $resultFilteredMachines = array();
++        if (is_array(@$allMachines['result']) && !empty($allMachines['result'])) {
++            foreach ($allMachines['result'] as $machine) {
++                $resultMachines[$machine->id] = $machine->id . ', ' . @$machine->address->city . ', ' . @$machine->address->street;
++
++                $resultMachinesDetails[$machine->id] = array(
++                    'id' => $machine->id,
++                    'address' => array(
++                        'building_number' => isset($machine->address->building_number) ? $machine->address->building_number : '',
++                        'flat_number' => isset($machine->address->flat_number) ? $machine->address->flat_number : '',
++                        'postcode' => isset($machine->address->post_code) ? $machine->address->post_code : '',
++                        'province' => isset($machine->address->province) ? $machine->address->province : '',
++                        'street' => isset($machine->address->street) ? $machine->address->street : '',
++                        'city' => isset($machine->address->city) ? $machine->address->city : ''
++                    )
++                );
++
++                if ($machine->address->post_code == $this->session->data['shipping_postcode'] || $machine->address->city == $city) {
++                    $resultFilteredMachines[$machine->id] = $machine->id . ', ' . @$machine->address->city . ', ' . @$machine->address->street;
++                }
++            }
++        }
++
++        if (is_array(@$resultFilteredMachines) && !empty($resultFilteredMachines)) {
++            $defaultSelect = $this->language->get('text_select_machine');
++        } else {
++            $defaultSelect = $this->language->get('text_no_machines');
++        }
++
++        $this->data['machines'] = $resultFilteredMachines;
++        $this->data['parcelTargetAllMachinesId'] = $resultMachines;
++        $this->data['parcelTargetMachinesId'] = $resultFilteredMachines;
++        $this->data['easypack24_machine_id'] = -1;
++        $this->data['defaultSelect'] = $defaultSelect;
++        $this->data['receiver_phone'] = $this->customer->getTelephone();
++        $this->data['entry_receiver_phone'] = $phone;
++
++        $this->session->data['easypack24_all_machines'] = $resultMachinesDetails;
++    }
++
++    public function validate() {
+ 		$this->language->load('checkout/checkout');
+ 		
+ 		$json = array();		
+@@ -131,6 +193,19 @@ class ControllerCheckoutShippingMethod e
+ 				break;
+ 			}				
+ 		}
++
++        // Validate data for easypack24 shipment method
++        if ($this->request->post['shipping_method'] == 'easypack24.easypack24') {
++            if (!$this->request->post['easypack24_receiver_phone']) {
++                $json['error']['warning'] = 'No receiver phone';
++            }
++            if ((utf8_strlen($this->request->post['easypack24_receiver_phone']) != 9) || !preg_match('/^[1-9]{1}\d{8}$/i', $this->request->post['easypack24_receiver_phone'])) {
++                $json['error']['warning'] = 'Receiver phone has wrong format. It should be 9 digits only';
++            }
++            if (!$this->request->post['easypack24_machine_id']) {
++                $json['error']['warning'] = 'No target machine selected';
++            }
++        }
+ 				
+ 		if (!$json) {
+ 			if (!isset($this->request->post['shipping_method'])) {
+@@ -149,10 +224,18 @@ class ControllerCheckoutShippingMethod e
+ 				$this->session->data['shipping_method'] = $this->session->data['shipping_methods'][$shipping[0]]['quote'][$shipping[1]];
+ 				
+ 				$this->session->data['comment'] = strip_tags($this->request->post['comment']);
++
++                $all_machines = $this->session->data['easypack24_all_machines'];
++                $machine = $all_machines[$this->request->post['easypack24_machine_id']];
++                $this->session->data['easypack24_shipping_address_1'] = $this->request->post['easypack24_machine_id'];
++                $this->session->data['easypack24_shipping_address_2'] = $machine['address']['street'] . ' ' . $machine['address']['building_number'] . ' ' . $machine['address']['flat_number'];
++                $this->session->data['easypack24_shipping_city'] = $machine['address']['city'];
++                $this->session->data['easypack24_shipping_postcode'] = $machine['address']['postcode'];
++                unset($this->session->data['easypack24_all_machines']);
+ 			}							
+ 		}
+ 		
+ 		$this->response->setOutput(json_encode($json));	
+ 	}
+ }
+-?>
+\ No newline at end of file
++?>
+diff -rupN opencart-base-backup/catalog/model/total/shipping.php opencart-base-patched-backup/catalog/model/total/shipping.php
+--- opencart-base-backup/catalog/model/total/shipping.php	2013-03-18 14:54:53.154900534 +0100
++++ opencart-base-patched-backup/catalog/model/total/shipping.php	2013-03-18 15:10:16.754912635 +0100
+@@ -10,7 +10,7 @@ class ModelTotalShipping extends Model {
+ 				'sort_order' => $this->config->get('shipping_sort_order')
+ 			);
+ 
+-			if ($this->session->data['shipping_method']['tax_class_id']) {
++            if (!empty($this->session->data['shipping_method']['tax_class_id'])) {
+ 				$tax_rates = $this->tax->getRates($this->session->data['shipping_method']['cost'], $this->session->data['shipping_method']['tax_class_id']);
+ 				
+ 				foreach ($tax_rates as $tax_rate) {
+diff -rupN opencart-base-backup/catalog/view/theme/default/template/checkout/checkout.tpl opencart-base-patched-backup/catalog/view/theme/default/template/checkout/checkout.tpl
+--- opencart-base-backup/catalog/view/theme/default/template/checkout/checkout.tpl	2013-03-18 14:54:53.154900534 +0100
++++ opencart-base-patched-backup/catalog/view/theme/default/template/checkout/checkout.tpl	2013-03-18 15:10:16.758912634 +0100
+@@ -825,7 +825,7 @@ $('#button-shipping-method').live('click
+ 	$.ajax({
+ 		url: 'index.php?route=checkout/shipping_method/validate',
+ 		type: 'post',
+-		data: $('#shipping-method input[type=\'radio\']:checked, #shipping-method textarea'),
++        data: $('#shipping-method input[type=\'radio\']:checked, #shipping-method textarea, #shipping-method select, #shipping-method input[type=\'text\']'),
+ 		dataType: 'json',
+ 		beforeSend: function() {
+ 			$('#button-shipping-method').attr('disabled', true);
+diff -rupN opencart-base-backup/catalog/view/theme/default/template/checkout/shipping_method.tpl opencart-base-patched-backup/catalog/view/theme/default/template/checkout/shipping_method.tpl
+--- opencart-base-backup/catalog/view/theme/default/template/checkout/shipping_method.tpl	2013-03-18 14:54:53.154900534 +0100
++++ opencart-base-patched-backup/catalog/view/theme/default/template/checkout/shipping_method.tpl	2013-03-18 15:10:16.758912634 +0100
+@@ -1,3 +1,29 @@
++<script type="text/javascript">
++    function map_callback(value) {
++        var address = value.split(';');
++        var box_machine_name = document.value=address[0];
++        var box_machine_town = document.value=address[1];
++        var box_machine_street = document.value=address[2];
++
++        var is_value = 0;
++        document.getElementById('shipping_easypack24').value = box_machine_name;
++        var shipping_easypack24 = document.getElementById('shipping_easypack24');
++
++        for(i=0;i<shipping_easypack24.length;i++){
++            if(shipping_easypack24.options[i].value == box_machine_name){
++                shipping_easypack24.selectedIndex = i;
++                is_value = 1;
++            }
++        }
++
++        if (is_value == 0){
++            shipping_easypack24.options[shipping_easypack24.options.length] = new Option(box_machine_name+','+box_machine_town+','+box_machine_street, box_machine_name);
++            shipping_easypack24.selectedIndex = shipping_easypack24.length-1;
++        }
++    }
++    $.getScript("https://geowidget.inpost.co.uk/dropdown.php?user_function=map_callback");
++</script>
++
+ <?php if ($error_warning) { ?>
+ <div class="warning"><?php echo $error_warning; ?></div>
+ <?php } ?>
+@@ -20,6 +46,57 @@
+     <td><label for="<?php echo $quote['code']; ?>"><?php echo $quote['title']; ?></label></td>
+     <td style="text-align: right;"><label for="<?php echo $quote['code']; ?>"><?php echo $quote['text']; ?></label></td>
+   </tr>
++    <?php if ($quote['code'] == 'easypack24.easypack24') { ?>
++    <tr class="highlight" id="shipping-easypack24">
++        <td>&nbsp;</td>
++        <td>
++            <span class="required">*</span><select id="shipping_easypack24" name="easypack24_machine_id">
++                <option value='' <?php if($easypack24_machine_id == ''){ echo "selected=selected";} ?>><?php echo $defaultSelect;?></option>
++
++                <?php foreach($parcelTargetMachinesId as $key => $parcelTargetMachineId) { ?>
++                <option value='<?php echo $key ?>' <?php if($easypack24_machine_id == $parcelTargetMachineId){ echo "selected=selected";} ?>><?php echo $parcelTargetMachineId;?></option>
++                <?php } ?>
++            </select>
++            <br/>
++            <a href="#" onclick="openMap(); return false;">Map</a>
++            &nbsp|&nbsp<input type="checkbox" name="show_all_machines"> Show terminals in other cities
++            <br/><br/>
++            <span class="required">*</span> <?php echo $entry_receiver_phone; ?>
++            <br/>
++            (07) <input type="text" name="easypack24_receiver_phone" value="<?php echo $receiver_phone ?>" class="large-field" />
++        </td>
++        <td>&nbsp;</td>
++    </tr>
++    <script type="text/javascript">
++        $(document).ready(function(){
++            $('input[type="checkbox"][name="show_all_machines"]').click(function(){
++                var machines_list_type = $(this).is(':checked');
++                if(machines_list_type == true){
++                    var machines = {
++                        '' : 'Select Machine..',
++                            <?php foreach($parcelTargetAllMachinesId as $key => $parcelTargetAllMachineId) { ?>
++                        '<?php echo $key ?>' : '<?php echo addslashes($parcelTargetAllMachineId) ?>',
++                    <?php } ?>
++                };
++            }else{
++                var machines = {
++                    '' : 'Select Machine..',
++                        <?php foreach($parcelTargetMachinesId as $key => $parcelTargetMachineId) { ?>
++                    '<?php echo $key ?>' : '<?php echo addslashes($parcelTargetMachineId) ?>',
++                <?php } ?>
++            };
++        }
++
++        $('#shipping_easypack24 option').remove();
++        $.each(machines, function(val, text) {
++            $('#shipping_easypack24').append(
++                    $('<option></option>').val(val).html(text)
++            );
++        });
++        });
++        });
++    </script>
++    <?php } ?>
+   <?php } ?>
+   <?php } else { ?>
+   <tr>
+@@ -39,3 +116,16 @@
+     <input type="button" value="<?php echo $button_continue; ?>" id="button-shipping-method" class="button" />
+   </div>
+ </div>
++
++<script type="text/javascript">
++    $(document).ready(function(){
++        $('input[type="radio"][name="shipping_method"]').change(function() {
++            if (this.value == 'easypack24.easypack24') {
++                $('#shipping-easypack24').show();
++            } else {
++                $('#shipping-easypack24').hide();
++            }
++        });
++    });
++    $('#shipping-easypack24').hide();
++</script>
+\ No newline at end of file
+diff -rupN opencart-base-backup/index.php opencart-base-patched-backup/index.php
+--- opencart-base-backup/index.php	2013-03-18 14:54:53.102900532 +0100
++++ opencart-base-patched-backup/index.php	2013-03-18 15:10:16.706912635 +0100
+@@ -213,7 +213,10 @@ $registry->set('cart', new Cart($registr
+ 
+ // Encryption
+ $registry->set('encryption', new Encryption($config->get('config_encryption')));
+-		
++
++// Easypack24 Helper
++$registry->set('easypack24_helper', new Easypack24HelperData($registry));
++
+ // Front Controller 
+ $controller = new Front($registry);
+ 
+diff -rupN opencart-base-backup/system/startup.php opencart-base-patched-backup/system/startup.php
+--- opencart-base-backup/system/startup.php	2013-03-18 14:54:53.134900534 +0100
++++ opencart-base-patched-backup/system/startup.php	2013-03-18 15:10:16.742912635 +0100
+@@ -101,4 +101,5 @@ require_once(DIR_SYSTEM . 'library/reque
+ require_once(DIR_SYSTEM . 'library/response.php');
+ require_once(DIR_SYSTEM . 'library/session.php');
+ require_once(DIR_SYSTEM . 'library/template.php');
++require_once(DIR_SYSTEM . 'library/easypack24.php');
+ ?>
+\ No newline at end of file
