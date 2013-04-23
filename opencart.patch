@@ -1,23 +1,648 @@
-diff -rupN opencart-base-backup/admin/controller/common/header.php opencart-base-patched-backup/admin/controller/common/header.php
+diff -x '*.idea*' -Nrup opencart-base-backup/admin/controller/common/header.php opencart-base-patched-backup/admin/controller/common/header.php
 --- opencart-base-backup/admin/controller/common/header.php	2013-03-18 14:54:53.102900532 +0100
-+++ opencart-base-patched-backup/admin/controller/common/header.php	2013-03-18 15:10:16.706912635 +0100
++++ opencart-base-patched-backup/admin/controller/common/header.php	2013-04-22 15:42:44.666258981 +0200
 @@ -41,6 +41,7 @@ class ControllerCommonHeader extends Con
  		$this->data['text_design'] = $this->language->get('text_design');
  		$this->data['text_documentation'] = $this->language->get('text_documentation');
  		$this->data['text_download'] = $this->language->get('text_download');
-+        $this->data['text_easypack24_order'] = $this->language->get('text_easypack24_order');
++		$this->data['text_easypack24_order'] = $this->language->get('text_easypack24_order');
  		$this->data['text_error_log'] = $this->language->get('text_error_log');
  		$this->data['text_extension'] = $this->language->get('text_extension');
  		$this->data['text_feed'] = $this->language->get('text_feed');
-@@ -126,6 +127,7 @@ class ControllerCommonHeader extends Con
+@@ -126,9 +127,10 @@ class ControllerCommonHeader extends Con
  			$this->data['customer_ban_ip'] = $this->url->link('sale/customer_ban_ip', 'token=' . $this->session->data['token'], 'SSL');
  			$this->data['custom_field'] = $this->url->link('design/custom_field', 'token=' . $this->session->data['token'], 'SSL');
  			$this->data['download'] = $this->url->link('catalog/download', 'token=' . $this->session->data['token'], 'SSL');
-+            $this->data['easypack24_order'] = $this->url->link('sale/easypack24_order', 'token=' . $this->session->data['token'], 'SSL');
++			$this->data['easypack24_order'] = $this->url->link('sale/easypack24_order', 'token=' . $this->session->data['token'], 'SSL');
  			$this->data['error_log'] = $this->url->link('tool/error_log', 'token=' . $this->session->data['token'], 'SSL');
- 			$this->data['feed'] = $this->url->link('extension/feed', 'token=' . $this->session->data['token'], 'SSL');	
- 			$this->data['filter'] = $this->url->link('catalog/filter', 'token=' . $this->session->data['token'], 'SSL');			
-diff -rupN opencart-base-backup/admin/index.php opencart-base-patched-backup/admin/index.php
+-			$this->data['feed'] = $this->url->link('extension/feed', 'token=' . $this->session->data['token'], 'SSL');	
+-			$this->data['filter'] = $this->url->link('catalog/filter', 'token=' . $this->session->data['token'], 'SSL');			
++			$this->data['feed'] = $this->url->link('extension/feed', 'token=' . $this->session->data['token'], 'SSL');
++			$this->data['filter'] = $this->url->link('catalog/filter', 'token=' . $this->session->data['token'], 'SSL');
+ 			$this->data['geo_zone'] = $this->url->link('localisation/geo_zone', 'token=' . $this->session->data['token'], 'SSL');
+ 			$this->data['information'] = $this->url->link('catalog/information', 'token=' . $this->session->data['token'], 'SSL');
+ 			$this->data['language'] = $this->url->link('localisation/language', 'token=' . $this->session->data['token'], 'SSL');
+diff -x '*.idea*' -Nrup opencart-base-backup/admin/controller/sale/easypack24_order.php opencart-base-patched-backup/admin/controller/sale/easypack24_order.php
+--- opencart-base-backup/admin/controller/sale/easypack24_order.php	1970-01-01 01:00:00.000000000 +0100
++++ opencart-base-patched-backup/admin/controller/sale/easypack24_order.php	2013-04-22 15:42:44.674258981 +0200
+@@ -0,0 +1,482 @@
++<?php
++class ControllerSaleEasypack24Order extends Controller
++{
++    private $error = array();
++
++    public function index()
++    {
++        $this->language->load('sale/easypack24_order');
++
++        $this->document->setTitle($this->language->get('heading_title'));
++
++        $this->load->model('sale/easypack24_order');
++
++        $this->getList();
++    }
++
++    public function cancel()
++    {
++        $this->language->load('sale/easypack24_order');
++
++        $this->document->setTitle($this->language->get('heading_title'));
++
++        $this->load->model('sale/easypack24_order');
++
++        $order_id = $this->request->get['order_id'];
++        $order = $this->model_sale_easypack24_order->getEasypack24Order($order_id);
++
++        $apiUrl = $this->config->get('easypack24_api_url');
++        $apiKey = $this->config->get('easypack24_api_key');
++        $response = $this->easypack24_helper->cancelParcel($apiKey, $apiUrl, $order['easypack24_parcel_id']);
++
++        if (empty($response['error'])) {
++            $this->model_sale_easypack24_order->cancelRegistration($order_id);
++        } else {
++            $this->error['warning'] = $this->language->get('error_cancel_registration');
++        }
++
++        $this->getList();
++    }
++
++    public function refresh()
++    {
++        $this->language->load('sale/easypack24_order');
++
++        $this->document->setTitle($this->language->get('heading_title'));
++
++        $this->load->model('sale/easypack24_order');
++
++        $order_id = $this->request->get['order_id'];
++        $order = $this->model_sale_easypack24_order->getEasypack24Order($order_id);
++
++        $apiUrl = $this->config->get('easypack24_api_url');
++        $apiKey = $this->config->get('easypack24_api_key');
++        $response = $this->easypack24_helper->refreshParcel($apiKey, $apiUrl, $order['easypack24_parcel_id']);
++
++        if (empty($response['error'])) {
++            $this->model_sale_easypack24_order->updateStatus($order_id, $response['status']);
++        } else {
++            $this->error['warning'] = $this->language->get('error_refresh_registration');
++        }
++
++        $this->getList();
++    }
++
++    public function sticker()
++    {
++        $this->language->load('sale/easypack24_order');
++
++        $this->document->setTitle($this->language->get('heading_title'));
++
++        $this->load->model('sale/easypack24_order');
++
++        $order_id = $this->request->get['order_id'];
++        $order = $this->model_sale_easypack24_order->getEasypack24Order($order_id);
++
++        $apiUrl = $this->config->get('easypack24_api_url');
++        $apiKey = $this->config->get('easypack24_api_key');
++
++        if ($order['easypack24_status'] == 'Created') {
++            $response = $this->easypack24_helper->payForParcel($apiKey, $apiUrl, $order['easypack24_parcel_id']);
++            if (empty($response['error'])) {
++                $this->model_sale_easypack24_order->updateStatus($order_id, 'Prepared');
++            } else {
++                $this->error['warning'] = $this->language->get('error_pay_for_parcel');
++            }
++        }
++
++        if (empty($this->error['warning'])) {
++            $response = $this->easypack24_helper->getSticker($apiKey, $apiUrl, $order['easypack24_parcel_id']);
++
++            if (empty($response['error'])) {
++                $pdf = $response['pdf'];
++
++                header('Content-type: application/pdf');
++                header('Content-Description: File Transfer');
++                header('Content-Disposition: attachment; filename=order-' . $order['easypack24_parcel_id'] . '.pdf');
++                header('Content-Transfer-Encoding: binary');
++                header('Expires: 0');
++                header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
++                header('Pragma: public');
++                header('Content-Length: ' . strlen($pdf));
++
++                echo $pdf;
++            } else {
++                $this->error['warning'] = $this->language->get('error_sticker');
++            }
++        }
++
++        if (!empty($this->error['warning'])) {
++            $this->getList();
++        }
++    }
++
++    public function register()
++    {
++        $this->language->load('sale/easypack24_order');
++
++        $this->document->setTitle($this->language->get('heading_title'));
++
++        $this->load->model('sale/easypack24_order');
++
++        $order_id = $this->request->get['order_id'];
++        $order = $this->model_sale_easypack24_order->getEasypack24Order($order_id);
++
++        $apiUrl = $this->config->get('easypack24_api_url');
++        $apiKey = $this->config->get('easypack24_api_key');
++
++        if (!empty($order['easypack24_parcel_id'])) {
++            $this->error['warning'] = $this->language->get('error_already_registered');
++        } else {
++            $response = $this->easypack24_helper->registerParcel($apiKey, $apiUrl, $order['telephone'], $order['email'], $order['machine_id'], $order['easypack24_parcel_size']);
++            if (empty($response['error'])) {
++                $this->model_sale_easypack24_order->updateAfterRegistration($order_id, $response['id']);
++            } else {
++                $this->error['warning'] = $this->language->get('error_registration') . reset($message);
++            }
++        }
++
++        $this->getList();
++    }
++
++    protected function getList()
++    {
++        if (isset($this->request->get['filter_order_id'])) {
++            $filter_order_id = $this->request->get['filter_order_id'];
++        } else {
++            $filter_order_id = null;
++        }
++
++        if (isset($this->request->get['filter_parcel_id'])) {
++            $filter_parcel_id = $this->request->get['filter_parcel_id'];
++        } else {
++            $filter_parcel_id = null;
++        }
++
++        if (isset($this->request->get['filter_parcel_size'])) {
++            $filter_parcel_size = $this->request->get['filter_parcel_size'];
++        } else {
++            $filter_parcel_size = null;
++        }
++
++        if (isset($this->request->get['filter_order_status'])) {
++            $filter_order_status = $this->request->get['filter_order_status'];
++        } else {
++            $filter_order_status = null;
++        }
++
++        if (isset($this->request->get['filter_machine_id'])) {
++            $filter_machine_id = $this->request->get['filter_machine_id'];
++        } else {
++            $filter_machine_id = null;
++        }
++
++        if (isset($this->request->get['filter_date_added'])) {
++            $filter_date_added = $this->request->get['filter_date_added'];
++        } else {
++            $filter_date_added = null;
++        }
++
++        if (isset($this->request->get['filter_date_modified'])) {
++            $filter_date_modified = $this->request->get['filter_date_modified'];
++        } else {
++            $filter_date_modified = null;
++        }
++
++        if (isset($this->request->get['sort'])) {
++            $sort = $this->request->get['sort'];
++        } else {
++            $sort = 'o.order_id';
++        }
++
++        if (isset($this->request->get['order'])) {
++            $order = $this->request->get['order'];
++        } else {
++            $order = 'DESC';
++        }
++
++        if (isset($this->request->get['page'])) {
++            $page = $this->request->get['page'];
++        } else {
++            $page = 1;
++        }
++
++        $url = '';
++
++        if (isset($this->request->get['filter_order_id'])) {
++            $url .= '&filter_order_id=' . $this->request->get['filter_order_id'];
++        }
++
++        if (isset($this->request->get['filter_parcel_id'])) {
++            $url .= '&filter_parcel_id=' . urlencode(html_entity_decode($this->request->get['filter_parcel_id'], ENT_QUOTES, 'UTF-8'));
++        }
++
++        if (isset($this->request->get['filter_order_status'])) {
++            $url .= '&filter_order_status=' . $this->request->get['filter_order_status'];
++        }
++
++        if (isset($this->request->get['filter_machine_id'])) {
++            $url .= '&filter_machine_id=' . $this->request->get['filter_machine_id'];
++        }
++
++        if (isset($this->request->get['filter_date_added'])) {
++            $url .= '&filter_date_added=' . $this->request->get['filter_date_added'];
++        }
++
++        if (isset($this->request->get['filter_date_modified'])) {
++            $url .= '&filter_date_modified=' . $this->request->get['filter_date_modified'];
++        }
++
++        if (isset($this->request->get['sort'])) {
++            $url .= '&sort=' . $this->request->get['sort'];
++        }
++
++        if (isset($this->request->get['order'])) {
++            $url .= '&order=' . $this->request->get['order'];
++        }
++
++        if (isset($this->request->get['page'])) {
++            $url .= '&page=' . $this->request->get['page'];
++        }
++
++        $this->data['breadcrumbs'] = array();
++
++        $this->data['breadcrumbs'][] = array(
++            'text' => $this->language->get('text_home'),
++            'href' => $this->url->link('common/home', 'token=' . $this->session->data['token'], 'SSL'),
++            'separator' => false
++        );
++
++        $this->data['breadcrumbs'][] = array(
++            'text' => $this->language->get('heading_title'),
++            'href' => $this->url->link('sale/easypack24_order', 'token=' . $this->session->data['token'] . $url, 'SSL'),
++            'separator' => ' :: '
++        );
++
++        $this->data['sticker'] = $this->url->link('sale/easypack24_order/sticker', 'token=' . $this->session->data['token'], 'SSL');
++        $this->data['refresh'] = $this->url->link('sale/easypack24_order/refresh', 'token=' . $this->session->data['token'], 'SSL');
++        $this->data['cancel'] = $this->url->link('sale/easypack24_order/cancel', 'token=' . $this->session->data['token'] . $url, 'SSL');
++
++        $this->data['orders'] = array();
++
++        $data = array(
++            'filter_order_id' => $filter_order_id,
++            'filter_parcel_id' => $filter_parcel_id,
++            'filter_parcel_size' => $filter_parcel_size,
++            'filter_order_status' => $filter_order_status,
++            'filter_machine_id' => $filter_machine_id,
++            'filter_date_added' => $filter_date_added,
++            'filter_date_modified' => $filter_date_modified,
++            'sort' => $sort,
++            'order' => $order,
++            'start' => ($page - 1) * $this->config->get('config_admin_limit'),
++            'limit' => $this->config->get('config_admin_limit')
++        );
++
++        $order_total = $this->model_sale_easypack24_order->getTotalOrders($data);
++
++        $results = $this->model_sale_easypack24_order->getOrders($data);
++
++        foreach ($results as $result) {
++            $action = array();
++
++            if (empty($result['easypack24_parcel_id'])) {
++                $action[] = array(
++                    'text' => $this->language->get('text_register'),
++                    'href' => $this->url->link('sale/easypack24_order/register', 'token=' . $this->session->data['token'] . '&order_id=' . $result['order_id'] . $url, 'SSL')
++                );
++            } else if (!empty($result['easypack24_status'])) {
++                $action[] = array(
++                    'text' => $this->language->get('text_sticker'),
++                    'href' => $this->url->link('sale/easypack24_order/sticker', 'token=' . $this->session->data['token'] . '&order_id=' . $result['order_id'] . $url, 'SSL'),
++                    'target' => '_blank'
++                );
++                if ($result['easypack24_status'] == 'Created') {
++                    $action[] = array(
++                        'text' => $this->language->get('text_cancel'),
++                        'href' => $this->url->link('sale/easypack24_order/cancel', 'token=' . $this->session->data['token'] . '&order_id=' . $result['order_id'] . $url, 'SSL')
++                    );
++                }
++                $action[] = array(
++                    'text' => $this->language->get('text_refresh'),
++                    'href' => $this->url->link('sale/easypack24_order/refresh', 'token=' . $this->session->data['token'] . '&order_id=' . $result['order_id'] . $url, 'SSL')
++                );
++            }
++
++            $action[] = array(
++                'text' => $this->language->get('text_view'),
++                'href' => $this->url->link('sale/order/info', 'token=' . $this->session->data['token'] . '&order_id=' . $result['order_id'] . $url, 'SSL')
++            );
++
++            if (strtotime($result['date_added']) > strtotime('-' . (int)$this->config->get('config_order_edit') . ' day')) {
++                $action[] = array(
++                    'text' => $this->language->get('text_edit'),
++                    'href' => $this->url->link('sale/order/update', 'token=' . $this->session->data['token'] . '&order_id=' . $result['order_id'] . $url, 'SSL')
++                );
++            }
++
++            $this->data['orders'][] = array(
++                'order_id' => $result['order_id'],
++                'machine_id' => $result['shipping_address_1'],
++                'status' => $result['easypack24_status'],
++                'parcel_id' => $result['easypack24_parcel_id'],
++                'parcel_size' => $result['easypack24_parcel_size'],
++                'date_added' => date($this->language->get('date_format_short'), strtotime($result['date_added'])),
++                'date_modified' => date($this->language->get('date_format_short'), strtotime($result['date_modified'])),
++                'action' => $action
++            );
++        }
++
++        $this->data['heading_title'] = $this->language->get('heading_title');
++
++        $this->data['text_no_results'] = $this->language->get('text_no_results');
++        $this->data['text_missing'] = $this->language->get('text_missing');
++
++        $this->data['column_order_id'] = $this->language->get('column_order_id');
++        $this->data['column_parcel_id'] = $this->language->get('column_parcel_id');
++        $this->data['column_parcel_size'] = $this->language->get('column_parcel_size');
++        $this->data['column_status'] = $this->language->get('column_status');
++        $this->data['column_machine_id'] = $this->language->get('column_machine_id');
++        $this->data['column_date_added'] = $this->language->get('column_date_added');
++        $this->data['column_date_modified'] = $this->language->get('column_date_modified');
++        $this->data['column_action'] = $this->language->get('column_action');
++
++        $this->data['button_sticker'] = $this->language->get('button_sticker');
++        $this->data['button_refresh'] = $this->language->get('button_refresh');
++        $this->data['button_cancel'] = $this->language->get('button_cancel');
++        $this->data['button_filter'] = $this->language->get('button_filter');
++
++        $this->data['token'] = $this->session->data['token'];
++
++        if (isset($this->error['warning'])) {
++            $this->data['error_warning'] = $this->error['warning'];
++        } else {
++            $this->data['error_warning'] = '';
++        }
++
++        if (isset($this->session->data['success'])) {
++            $this->data['success'] = $this->session->data['success'];
++
++            unset($this->session->data['success']);
++        } else {
++            $this->data['success'] = '';
++        }
++
++        $url = '';
++
++        if (isset($this->request->get['filter_order_id'])) {
++            $url .= '&filter_order_id=' . $this->request->get['filter_order_id'];
++        }
++
++        if (isset($this->request->get['filter_parcel_id'])) {
++            $url .= '&filter_parcel_id=' . urlencode(html_entity_decode($this->request->get['filter_parcel_id'], ENT_QUOTES, 'UTF-8'));
++        }
++
++        if (isset($this->request->get['filter_parcel_size'])) {
++            $url .= '&filter_parcel_size=' . $this->request->get['filter_parcel_size'];
++        }
++
++        if (isset($this->request->get['filter_order_status'])) {
++            $url .= '&filter_order_status=' . $this->request->get['filter_order_status'];
++        }
++
++        if (isset($this->request->get['filter_machine_id'])) {
++            $url .= '&filter_machine_id=' . $this->request->get['filter_machine_id'];
++        }
++
++        if (isset($this->request->get['filter_date_added'])) {
++            $url .= '&filter_date_added=' . $this->request->get['filter_date_added'];
++        }
++
++        if (isset($this->request->get['filter_date_modified'])) {
++            $url .= '&filter_date_modified=' . $this->request->get['filter_date_modified'];
++        }
++
++        if ($order == 'ASC') {
++            $url .= '&order=DESC';
++        } else {
++            $url .= '&order=ASC';
++        }
++
++        if (isset($this->request->get['page'])) {
++            $url .= '&page=' . $this->request->get['page'];
++        }
++
++        $this->data['sort_order'] = $this->url->link('sale/easypack24_order', 'token=' . $this->session->data['token'] . '&sort=o.order_id' . $url, 'SSL');
++        $this->data['sort_parcel_id'] = $this->url->link('sale/easypack24_order', 'token=' . $this->session->data['token'] . '&sort=o.easypack24_parcel_id' . $url, 'SSL');
++        $this->data['sort_parcel_size'] = $this->url->link('sale/easypack24_order', 'token=' . $this->session->data['token'] . '&sort=o.easypack24_parcel_size' . $url, 'SSL');
++        $this->data['sort_status'] = $this->url->link('sale/easypack24_order', 'token=' . $this->session->data['token'] . '&sort=o.easypack24_status' . $url, 'SSL');
++        $this->data['sort_total'] = $this->url->link('sale/easypack24_order', 'token=' . $this->session->data['token'] . '&sort=o.shipping_address_1' . $url, 'SSL');
++        $this->data['sort_date_added'] = $this->url->link('sale/easypack24_order', 'token=' . $this->session->data['token'] . '&sort=o.date_added' . $url, 'SSL');
++        $this->data['sort_date_modified'] = $this->url->link('sale/easypack24_order', 'token=' . $this->session->data['token'] . '&sort=o.date_modified' . $url, 'SSL');
++
++        $url = '';
++
++        if (isset($this->request->get['filter_order_id'])) {
++            $url .= '&filter_order_id=' . $this->request->get['filter_order_id'];
++        }
++
++        if (isset($this->request->get['filter_parcel_id'])) {
++            $url .= '&filter_parcel_id=' . urlencode(html_entity_decode($this->request->get['filter_parcel_id'], ENT_QUOTES, 'UTF-8'));
++        }
++
++        if (isset($this->request->get['filter_parcel_size'])) {
++            $url .= '&filter_parcel_size=' . $this->request->get['filter_parcel_size'];
++        }
++
++        if (isset($this->request->get['filter_order_status'])) {
++            $url .= '&filter_order_status=' . $this->request->get['filter_order_status'];
++        }
++
++        if (isset($this->request->get['filter_machine_id'])) {
++            $url .= '&filter_machine_id=' . $this->request->get['filter_machine_id'];
++        }
++
++        if (isset($this->request->get['filter_date_added'])) {
++            $url .= '&filter_date_added=' . $this->request->get['filter_date_added'];
++        }
++
++        if (isset($this->request->get['filter_date_modified'])) {
++            $url .= '&filter_date_modified=' . $this->request->get['filter_date_modified'];
++        }
++
++        if (isset($this->request->get['sort'])) {
++            $url .= '&sort=' . $this->request->get['sort'];
++        }
++
++        if (isset($this->request->get['order'])) {
++            $url .= '&order=' . $this->request->get['order'];
++        }
++
++        $pagination = new Pagination();
++        $pagination->total = $order_total;
++        $pagination->page = $page;
++        $pagination->limit = $this->config->get('config_admin_limit');
++        $pagination->text = $this->language->get('text_pagination');
++        $pagination->url = $this->url->link('sale/order', 'token=' . $this->session->data['token'] . $url . '&page={page}', 'SSL');
++
++        $this->data['pagination'] = $pagination->render();
++
++        $this->data['filter_order_id'] = $filter_order_id;
++        $this->data['filter_parcel_id'] = $filter_parcel_id;
++        $this->data['filter_parcel_size'] = $filter_parcel_size;
++        $this->data['filter_order_status'] = $filter_order_status;
++        $this->data['filter_machine_id'] = $filter_machine_id;
++        $this->data['filter_date_added'] = $filter_date_added;
++        $this->data['filter_date_modified'] = $filter_date_modified;
++
++        $this->load->model('localisation/order_status');
++
++        $this->data['sort'] = $sort;
++        $this->data['order'] = $order;
++
++        $this->template = 'sale/easypack24_order_list.tpl';
++        $this->children = array(
++            'common/header',
++            'common/footer'
++        );
++
++        $this->response->setOutput($this->render());
++    }
++}
++?>
+diff -x '*.idea*' -Nrup opencart-base-backup/admin/controller/shipping/easypack24.php opencart-base-patched-backup/admin/controller/shipping/easypack24.php
+--- opencart-base-backup/admin/controller/shipping/easypack24.php	1970-01-01 01:00:00.000000000 +0100
++++ opencart-base-patched-backup/admin/controller/shipping/easypack24.php	2013-04-22 15:42:44.670258981 +0200
+@@ -0,0 +1,129 @@
++<?php
++class ControllerShippingEasypack24 extends Controller
++{
++    private $error = array();
++
++    public function index()
++    {
++        $this->language->load('shipping/easypack24');
++
++        $this->document->setTitle($this->language->get('heading_title'));
++
++        $this->load->model('setting/setting');
++
++        if (($this->request->server['REQUEST_METHOD'] == 'POST') && $this->validate()) {
++            $this->model_setting_setting->editSetting('easypack24', $this->request->post);
++
++            $this->session->data['success'] = $this->language->get('text_success');
++
++            $this->redirect($this->url->link('extension/shipping', 'token=' . $this->session->data['token'], 'SSL'));
++        }
++
++        $this->setDataFromLanguage('heading_title');
++        $this->setDataFromLanguage('text_enabled');
++        $this->setDataFromLanguage('text_disabled');
++        $this->setDataFromLanguage('text_all_zones');
++        $this->setDataFromLanguage('text_none');
++
++        $this->setDataFromLanguage('entry_api_url');
++        $this->setDataFromLanguage('entry_api_key');
++        $this->setDataFromLanguage('entry_price');
++        $this->setDataFromLanguage('entry_max_weight');
++        $this->setDataFromLanguage('entry_max_dimension_a');
++        $this->setDataFromLanguage('entry_max_dimension_b');
++        $this->setDataFromLanguage('entry_max_dimension_c');
++        $this->setDataFromLanguage('entry_geo_zone');
++        $this->setDataFromLanguage('entry_tax_class');
++        $this->setDataFromLanguage('entry_status');
++        $this->setDataFromLanguage('entry_sort_order');
++
++        $this->setDataFromLanguage('button_save');
++        $this->setDataFromLanguage('button_cancel');
++
++        if (isset($this->error['warning'])) {
++            $this->data['error_warning'] = $this->error['warning'];
++        } else {
++            $this->data['error_warning'] = '';
++        }
++
++        $this->setBreadcrumbs();
++
++        $this->data['action'] = $this->url->link('shipping/easypack24', 'token=' . $this->session->data['token'], 'SSL');
++        $this->data['cancel'] = $this->url->link('extension/shipping', 'token=' . $this->session->data['token'], 'SSL');
++
++        $this->load->model('localisation/geo_zone');
++        $this->data['geo_zones'] = $this->model_localisation_geo_zone->getGeoZones();
++
++        $this->load->model('localisation/tax_class');
++        $this->data['tax_classes'] = $this->model_localisation_tax_class->getTaxClasses();
++
++        $this->setDataFromParameter('easypack24_api_url');
++        $this->setDataFromParameter('easypack24_api_key');
++        $this->setDataFromParameter('easypack24_price');
++        $this->setDataFromParameter('easypack24_max_weight');
++        $this->setDataFromParameter('easypack24_max_dimension_a');
++        $this->setDataFromParameter('easypack24_max_dimension_b');
++        $this->setDataFromParameter('easypack24_max_dimension_c');
++        $this->setDataFromParameter('easypack24_geo_zone_id');
++        $this->setDataFromParameter('easypack24_tax_class_id');
++        $this->setDataFromParameter('easypack24_status');
++        $this->setDataFromParameter('easypack24_sort_order');
++
++        $this->template = 'shipping/easypack24.tpl';
++        $this->children = array(
++            'common/header',
++            'common/footer'
++        );
++
++        $this->response->setOutput($this->render());
++    }
++
++    private function setDataFromLanguage($name)
++    {
++        $this->data[$name] = $this->language->get($name);
++    }
++
++    private function setBreadcrumbs()
++    {
++        $this->data['breadcrumbs'] = array();
++        $this->data['breadcrumbs'][] = array(
++            'text' => $this->language->get('text_home'),
++            'href' => $this->url->link('common/home', 'token=' . $this->session->data['token'], 'SSL'),
++            'separator' => false
++        );
++        $this->data['breadcrumbs'][] = array(
++            'text' => $this->language->get('text_shipping'),
++            'href' => $this->url->link('extension/shipping', 'token=' . $this->session->data['token'], 'SSL'),
++            'separator' => ' :: '
++        );
++        $this->data['breadcrumbs'][] = array(
++            'text' => $this->language->get('heading_title'),
++            'href' => $this->url->link('shipping/easypack24', 'token=' . $this->session->data['token'], 'SSL'),
++            'separator' => ' :: '
++        );
++    }
++
++    private function setDataFromParameter($name)
++    {
++        if (isset($this->request->post[$name])) {
++            $this->data[$name] = $this->request->post[$name];
++        } else {
++            $this->data[$name] = $this->config->get($name);
++        }
++    }
++
++    protected function validate()
++    {
++        if (!$this->user->hasPermission('modify', 'shipping/easypack24')) {
++            $this->error['warning'] = $this->language->get('error_permission');
++        }
++
++        if (!$this->error) {
++            return true;
++        } else {
++            return false;
++        }
++    }
++}
++
++?>
+\ No newline at end of file
+diff -x '*.idea*' -Nrup opencart-base-backup/admin/index.php opencart-base-patched-backup/admin/index.php
 --- opencart-base-backup/admin/index.php	2013-03-18 14:54:53.102900532 +0100
 +++ opencart-base-patched-backup/admin/index.php	2013-03-18 15:10:16.706912635 +0100
 @@ -138,7 +138,10 @@ $registry->set('length', new Length($reg
@@ -32,9 +657,9 @@ diff -rupN opencart-base-backup/admin/index.php opencart-base-patched-backup/adm
  // Front Controller
  $controller = new Front($registry);
  
-diff -rupN opencart-base-backup/admin/language/english/common/header.php opencart-base-patched-backup/admin/language/english/common/header.php
+diff -x '*.idea*' -Nrup opencart-base-backup/admin/language/english/common/header.php opencart-base-patched-backup/admin/language/english/common/header.php
 --- opencart-base-backup/admin/language/english/common/header.php	2013-03-18 14:54:53.110900531 +0100
-+++ opencart-base-patched-backup/admin/language/english/common/header.php	2013-03-18 15:10:16.710912635 +0100
++++ opencart-base-patched-backup/admin/language/english/common/header.php	2013-04-22 15:42:44.670258981 +0200
 @@ -21,6 +21,7 @@ $_['text_custom_field']                =
  $_['text_dashboard']                   = 'Dashboard';
  $_['text_design']                      = 'Design';
@@ -43,9 +668,217 @@ diff -rupN opencart-base-backup/admin/language/english/common/header.php opencar
  $_['text_error_log']                   = 'Error Logs';
  $_['text_extension']                   = 'Extensions';
  $_['text_feed']                        = 'Product Feeds';
-diff -rupN opencart-base-backup/admin/view/template/common/header.tpl opencart-base-patched-backup/admin/view/template/common/header.tpl
+diff -x '*.idea*' -Nrup opencart-base-backup/admin/language/english/sale/easypack24_order.php opencart-base-patched-backup/admin/language/english/sale/easypack24_order.php
+--- opencart-base-backup/admin/language/english/sale/easypack24_order.php	1970-01-01 01:00:00.000000000 +0100
++++ opencart-base-patched-backup/admin/language/english/sale/easypack24_order.php	2013-04-22 15:42:44.674258981 +0200
+@@ -0,0 +1,29 @@
++<?php
++// Heading
++$_['heading_title']                           = 'InPost Parcel Lockers 24/7';
++
++// Text
++$_['text_missing']                            = 'Missing Orders';
++$_['text_register']                           = 'Register';
++$_['text_cancel']                             = 'Cancel';
++$_['text_refresh']                            = 'Refresh';
++$_['text_sticker']                            = 'PDF Sticker';
++
++// Column
++$_['column_order_id']                         = 'Order ID';
++$_['column_machine_id']                       = 'Machine Id';
++$_['column_parcel_id']                        = 'Parcel ID';
++$_['column_parcel_size']                      = 'Parcel Size';
++$_['column_status']                           = 'Status';
++$_['column_date_added']                       = 'Date Added';
++$_['column_date_modified']                    = 'Date Modified';
++$_['column_action']                           = 'Action';
++
++// Error
++$_['error_already_registered']                = 'Parcel was already registered!';
++$_['error_registration']                      = 'There was an error in the registration process: ';
++$_['error_sticker']                           = 'There was an error while getting sticker: ';
++$_['error_cancel_registration']               = 'Registration could not be cancelled: ';
++$_['error_refresh_registration']              = 'Registration could not be refreshed: ';
++$_['error_pay_for_parcel']                    = 'There was an error while paying for parcel: ';
++?>
+\ No newline at end of file
+diff -x '*.idea*' -Nrup opencart-base-backup/admin/language/english/shipping/easypack24.php opencart-base-patched-backup/admin/language/english/shipping/easypack24.php
+--- opencart-base-backup/admin/language/english/shipping/easypack24.php	1970-01-01 01:00:00.000000000 +0100
++++ opencart-base-patched-backup/admin/language/english/shipping/easypack24.php	2013-04-22 15:42:44.674258981 +0200
+@@ -0,0 +1,24 @@
++<?php
++// Heading
++$_['heading_title'] = 'InPost Parcel Lockers 24/7';
++
++// Text 
++$_['text_shipping'] = 'Shipping';
++$_['text_success'] = 'Success: You have modified InPost Parcel Lockers 24/7 shipping!';
++
++// Entry
++$_['entry_api_url'] = 'Api url:';
++$_['entry_api_key'] = 'Api key:';
++$_['entry_price'] = 'Price:';
++$_['entry_max_weight'] = 'Max weight:<br /><span class="help">Max weight is 25</span>';
++$_['entry_max_dimension_a'] = 'Max dimension - size A:<br /><span class="help">Size A</span>';
++$_['entry_max_dimension_b'] = 'Max dimension - size B:<br /><span class="help">Size B</span>';
++$_['entry_max_dimension_c'] = 'Max dimension - size C:<br /><span class="help">Size C</span>';
++$_['entry_geo_zone'] = 'Geo Zone:';
++$_['entry_tax_class'] = 'Tax Class:';
++$_['entry_status'] = 'Status:';
++$_['entry_sort_order'] = 'Sort Order:';
++
++// Error
++$_['error_permission'] = 'Warning: You do not have permission to modify InPost Parcel Lockers 24/7 shipping!';
++?>
+\ No newline at end of file
+diff -x '*.idea*' -Nrup opencart-base-backup/admin/model/sale/easypack24_order.php opencart-base-patched-backup/admin/model/sale/easypack24_order.php
+--- opencart-base-backup/admin/model/sale/easypack24_order.php	1970-01-01 01:00:00.000000000 +0100
++++ opencart-base-patched-backup/admin/model/sale/easypack24_order.php	2013-04-22 15:42:44.678258981 +0200
+@@ -0,0 +1,140 @@
++<?php
++class ModelSaleEasypack24Order extends Model {
++
++    public function updateAfterRegistration($order_id, $parcel_id) {
++        $this->db->query("UPDATE `" . DB_PREFIX . "order` SET easypack24_status = 'Created', easypack24_parcel_id = '" . $this->db->escape($parcel_id) . "', date_modified = NOW() WHERE order_id = '" . (int)$order_id . "'");
++    }
++
++    public function cancelRegistration($order_id) {
++        $this->db->query("UPDATE `" . DB_PREFIX . "order` SET easypack24_status = 'Cancelled', easypack24_parcel_id = '', date_modified = NOW() WHERE order_id = '" . (int)$order_id . "'");
++    }
++
++    public function getEasypack24Order($order_id) {
++        $order_query = $this->db->query("SELECT * FROM `" . DB_PREFIX . "order` o WHERE o.order_id = '" . (int)$order_id . "'");
++
++        if ($order_query->num_rows) {
++            return array(
++				'email'                   => $order_query->row['email'],
++                'telephone'               => $order_query->row['telephone'],
++                'machine_id'              => $order_query->row['shipping_address_1'],
++                'easypack24_status'       => $order_query->row['easypack24_status'],
++                'easypack24_parcel_id'    => $order_query->row['easypack24_parcel_id'],
++                'easypack24_parcel_size'    => $order_query->row['easypack24_parcel_size']
++            );
++        } else {
++            return false;
++        }
++    }
++
++    public function updateStatus($order_id, $status) {
++        $this->db->query("UPDATE `" . DB_PREFIX . "order` SET easypack24_status = '" . $this->db->escape($status) . "', date_modified = NOW() WHERE order_id = '" . (int)$order_id . "'");
++    }
++
++	public function getOrders($data = array()) {
++		$sql = "SELECT o.order_id, CONCAT(o.firstname, ' ', o.lastname) AS customer, (SELECT os.name FROM " . DB_PREFIX . "order_status os WHERE os.order_status_id = o.order_status_id AND os.language_id = '" . (int)$this->config->get('config_language_id') . "') AS status, o.total, o.currency_code, o.currency_value, o.date_added, o.date_modified, o.shipping_address_1, o.easypack24_status, o.easypack24_parcel_id, o.easypack24_parcel_size FROM `" . DB_PREFIX . "order` o";
++
++        $sql .= " WHERE o.shipping_code = 'easypack24.easypack24'";
++
++		if (!empty($data['filter_order_status'])) {
++			$sql .= " AND o.easypack24_status LIKE '%" . $this->db->escape($data['filter_order_status']) . "%'";
++		}
++
++		if (!empty($data['filter_order_id'])) {
++			$sql .= " AND o.order_id = '" . (int)$data['filter_order_id'] . "'";
++		}
++
++		if (!empty($data['filter_parcel_id'])) {
++			$sql .= " AND o.easypack24_parcel_id LIKE '%" . $this->db->escape($data['filter_parcel_id']) . "%'";
++		}
++
++		if (!empty($data['filter_parcel_size'])) {
++			$sql .= " AND o.easypack24_parcel_size = '" . $this->db->escape($data['filter_parcel_size']) . "'";
++		}
++
++		if (!empty($data['filter_date_added'])) {
++			$sql .= " AND DATE(o.date_added) = DATE('" . $this->db->escape($data['filter_date_added']) . "')";
++		}
++
++		if (!empty($data['filter_date_modified'])) {
++			$sql .= " AND DATE(o.date_modified) = DATE('" . $this->db->escape($data['filter_date_modified']) . "')";
++		}
++
++		if (!empty($data['filter_machine_id'])) {
++			$sql .= " AND o.shipping_address_1 LIKE '%" . $data['filter_machine_id'] . "%'";
++		}
++
++		$sort_data = array(
++			'o.order_id',
++			'customer',
++			'o.date_added',
++			'o.date_modified',
++			'o.shipping_address_1',
++			'o.easypack24_status',
++			'o.easypack24_parcel_size',
++			'o.easypack24_parcel_id'
++		);
++
++		if (isset($data['sort']) && in_array($data['sort'], $sort_data)) {
++			$sql .= " ORDER BY " . $data['sort'];
++		} else {
++			$sql .= " ORDER BY o.order_id";
++		}
++
++		if (isset($data['order']) && ($data['order'] == 'DESC')) {
++			$sql .= " DESC";
++		} else {
++			$sql .= " ASC";
++		}
++
++		if (isset($data['start']) || isset($data['limit'])) {
++			if ($data['start'] < 0) {
++				$data['start'] = 0;
++			}
++
++			if ($data['limit'] < 1) {
++				$data['limit'] = 20;
++			}
++
++			$sql .= " LIMIT " . (int)$data['start'] . "," . (int)$data['limit'];
++		}
++
++		$query = $this->db->query($sql);
++
++		return $query->rows;
++	}
++
++    public function getTotalOrders($data = array()) {
++        $sql = "SELECT COUNT(*) AS total FROM `" . DB_PREFIX . "order` o";
++
++        $sql .= " WHERE o.shipping_code = 'easypack24.easypack24'";
++
++        if (!empty($data['filter_order_status'])) {
++            $sql .= " AND o.easypack24_status LIKE '%" . $this->db->escape($data['filter_order_status']) . "%'";
++        }
++
++        if (!empty($data['filter_order_id'])) {
++            $sql .= " AND o.order_id = '" . (int)$data['filter_order_id'] . "'";
++        }
++
++        if (!empty($data['filter_parcel_id'])) {
++            $sql .= " AND o.easypack24_parcel_id LIKE '%" . $this->db->escape($data['filter_parcel_id']) . "%'";
++        }
++
++        if (!empty($data['filter_date_added'])) {
++            $sql .= " AND DATE(o.date_added) = DATE('" . $this->db->escape($data['filter_date_added']) . "')";
++        }
++
++        if (!empty($data['filter_date_modified'])) {
++            $sql .= " AND DATE(o.date_modified) = DATE('" . $this->db->escape($data['filter_date_modified']) . "')";
++        }
++
++        if (!empty($data['filter_machine_id'])) {
++            $sql .= " AND o.shipping_address_1 LIKE '%" . $data['filter_machine_id'] . "%'";
++        }
++
++        $query = $this->db->query($sql);
++
++        return $query->row['total'];
++    }
++}
++?>
+\ No newline at end of file
+diff -x '*.idea*' -Nrup opencart-base-backup/admin/view/template/common/header.tpl opencart-base-patched-backup/admin/view/template/common/header.tpl
 --- opencart-base-backup/admin/view/template/common/header.tpl	2013-03-18 14:54:53.114900533 +0100
-+++ opencart-base-patched-backup/admin/view/template/common/header.tpl	2013-03-18 15:10:16.718912635 +0100
++++ opencart-base-patched-backup/admin/view/template/common/header.tpl	2013-04-22 15:42:44.670258981 +0200
 @@ -94,6 +94,7 @@ $(document).ready(function(){
        <li id="sale"><a class="top"><?php echo $text_sale; ?></a>
          <ul>
@@ -54,10 +887,274 @@ diff -rupN opencart-base-backup/admin/view/template/common/header.tpl opencart-b
            <li><a href="<?php echo $return; ?>"><?php echo $text_return; ?></a></li>
            <li><a class="parent"><?php echo $text_customer; ?></a>
              <ul>
-diff -rupN opencart-base-backup/catalog/controller/checkout/confirm.php opencart-base-patched-backup/catalog/controller/checkout/confirm.php
+diff -x '*.idea*' -Nrup opencart-base-backup/admin/view/template/sale/easypack24_order_list.tpl opencart-base-patched-backup/admin/view/template/sale/easypack24_order_list.tpl
+--- opencart-base-backup/admin/view/template/sale/easypack24_order_list.tpl	1970-01-01 01:00:00.000000000 +0100
++++ opencart-base-patched-backup/admin/view/template/sale/easypack24_order_list.tpl	2013-04-22 15:42:44.678258981 +0200
+@@ -0,0 +1,160 @@
++<?php echo $header; ?>
++<div id="content">
++  <div class="breadcrumb">
++    <?php foreach ($breadcrumbs as $breadcrumb) { ?>
++    <?php echo $breadcrumb['separator']; ?><a href="<?php echo $breadcrumb['href']; ?>"><?php echo $breadcrumb['text']; ?></a>
++    <?php } ?>
++  </div>
++  <?php if ($error_warning) { ?>
++  <div class="warning"><?php echo $error_warning; ?></div>
++  <?php } ?>
++  <?php if ($success) { ?>
++  <div class="success"><?php echo $success; ?></div>
++  <?php } ?>
++  <div class="box">
++    <div class="heading">
++      <h1><img src="view/image/order.png" alt="" /> <?php echo $heading_title; ?></h1>
++    </div>
++    <div class="content">
++      <form action="" method="post" enctype="multipart/form-data" id="form">
++        <table class="list">
++          <thead>
++            <tr>
++              <td class="right"><?php if ($sort == 'o.order_id') { ?>
++                <a href="<?php echo $sort_order; ?>" class="<?php echo strtolower($order); ?>"><?php echo $column_order_id; ?></a>
++                <?php } else { ?>
++                <a href="<?php echo $sort_order; ?>"><?php echo $column_order_id; ?></a>
++                <?php } ?></td>
++              <td class="left"><?php if ($sort == 'parcel_id') { ?>
++                <a href="<?php echo $sort_parcel_id; ?>" class="<?php echo strtolower($order); ?>"><?php echo $column_parcel_id; ?></a>
++                <?php } else { ?>
++                <a href="<?php echo $sort_parcel_id; ?>"><?php echo $column_parcel_id; ?></a>
++                <?php } ?></td>
++              <td class="left"><?php if ($sort == 'parcel_size') { ?>
++                <a href="<?php echo $sort_parcel_size; ?>" class="<?php echo strtolower($order); ?>"><?php echo $column_parcel_size; ?></a>
++                <?php } else { ?>
++                <a href="<?php echo $sort_parcel_size; ?>"><?php echo $column_parcel_size; ?></a>
++                <?php } ?></td>
++              <td class="left"><?php if ($sort == 'status') { ?>
++                <a href="<?php echo $sort_status; ?>" class="<?php echo strtolower($order); ?>"><?php echo $column_status; ?></a>
++                <?php } else { ?>
++                <a href="<?php echo $sort_status; ?>"><?php echo $column_status; ?></a>
++                <?php } ?></td>
++              <td class="left"><?php if ($sort == 'o.shipping_address_1') { ?>
++                <a href="<?php echo $sort_total; ?>" class="<?php echo strtolower($order); ?>"><?php echo $column_machine_id; ?></a>
++                <?php } else { ?>
++                <a href="<?php echo $sort_total; ?>"><?php echo $column_machine_id; ?></a>
++                <?php } ?></td>
++              <td class="left"><?php if ($sort == 'o.date_added') { ?>
++                <a href="<?php echo $sort_date_added; ?>" class="<?php echo strtolower($order); ?>"><?php echo $column_date_added; ?></a>
++                <?php } else { ?>
++                <a href="<?php echo $sort_date_added; ?>"><?php echo $column_date_added; ?></a>
++                <?php } ?></td>
++              <td class="left"><?php if ($sort == 'o.date_modified') { ?>
++                <a href="<?php echo $sort_date_modified; ?>" class="<?php echo strtolower($order); ?>"><?php echo $column_date_modified; ?></a>
++                <?php } else { ?>
++                <a href="<?php echo $sort_date_modified; ?>"><?php echo $column_date_modified; ?></a>
++                <?php } ?></td>
++              <td class="right"><?php echo $column_action; ?></td>
++            </tr>
++          </thead>
++          <tbody>
++            <tr class="filter">
++              <td align="right"><input type="text" name="filter_order_id" value="<?php echo $filter_order_id; ?>" size="4" style="text-align: right;" /></td>
++              <td><input type="text" name="filter_parcel_id" value="<?php echo $filter_parcel_id; ?>" /></td>
++              <td><input type="text" name="filter_parcel_size" value="<?php echo $filter_parcel_size; ?>" /></td>
++              <td><input type="text" name="filter_order_status" value="<?php echo $filter_order_status; ?>" /></td>
++              <td align="left"><input type="text" name="filter_machine_id" value="<?php echo $filter_machine_id; ?>" /></td>
++              <td><input type="text" name="filter_date_added" value="<?php echo $filter_date_added; ?>" size="12" class="date" /></td>
++              <td><input type="text" name="filter_date_modified" value="<?php echo $filter_date_modified; ?>" size="12" class="date" /></td>
++              <td align="right"><a onclick="filter();" class="button"><?php echo $button_filter; ?></a></td>
++            </tr>
++            <?php if ($orders) { ?>
++            <?php foreach ($orders as $order) { ?>
++            <tr>
++              <td class="right"><?php echo $order['order_id']; ?></td>
++              <td class="left"><?php echo $order['parcel_id']; ?></td>
++              <td class="left"><?php echo $order['parcel_size']; ?></td>
++              <td class="left"><?php echo $order['status']; ?></td>
++              <td class="left"><?php echo $order['machine_id']; ?></td>
++              <td class="left"><?php echo $order['date_added']; ?></td>
++              <td class="left"><?php echo $order['date_modified']; ?></td>
++              <td class="right"><?php foreach ($order['action'] as $action) { ?>
++                [ <a href="<?php echo $action['href']; ?>"<?php if (!empty($action['target'])) echo ' target="'.$action['target'].'"' ?>><?php echo $action['text']; ?></a> ]
++                <?php } ?></td>
++            </tr>
++            <?php } ?>
++            <?php } else { ?>
++            <tr>
++              <td class="center" colspan="8"><?php echo $text_no_results; ?></td>
++            </tr>
++            <?php } ?>
++          </tbody>
++        </table>
++      </form>
++      <div class="pagination"><?php echo $pagination; ?></div>
++    </div>
++  </div>
++</div>
++<script type="text/javascript"><!--
++function filter() {
++	url = 'index.php?route=sale/easypack24_order&token=<?php echo $token; ?>';
++	
++	var filter_order_id = $('input[name=\'filter_order_id\']').attr('value');
++	
++	if (filter_order_id) {
++		url += '&filter_order_id=' + encodeURIComponent(filter_order_id);
++	}
++	
++	var filter_parcel_id = $('input[name=\'filter_parcel_id\']').attr('value');
++	
++	if (filter_parcel_id) {
++		url += '&filter_parcel_id=' + encodeURIComponent(filter_parcel_id);
++	}
++	
++	var filter_parcel_size = $('input[name=\'filter_parcel_size\']').attr('value');
++
++	if (filter_parcel_size) {
++		url += '&filter_parcel_size=' + encodeURIComponent(filter_parcel_size);
++	}
++
++	var filter_order_status = $('input[name=\'filter_order_status\']').attr('value');
++	
++	if (filter_order_status) {
++		url += '&filter_order_status=' + encodeURIComponent(filter_order_status);
++	}	
++
++	var filter_machine_id = $('input[name=\'filter_machine_id\']').attr('value');
++
++	if (filter_machine_id) {
++		url += '&filter_machine_id=' + encodeURIComponent(filter_machine_id);
++	}	
++	
++	var filter_date_added = $('input[name=\'filter_date_added\']').attr('value');
++	
++	if (filter_date_added) {
++		url += '&filter_date_added=' + encodeURIComponent(filter_date_added);
++	}
++	
++	var filter_date_modified = $('input[name=\'filter_date_modified\']').attr('value');
++	
++	if (filter_date_modified) {
++		url += '&filter_date_modified=' + encodeURIComponent(filter_date_modified);
++	}
++				
++	location = url;
++}
++//--></script>  
++<script type="text/javascript"><!--
++$(document).ready(function() {
++	$('.date').datepicker({dateFormat: 'yy-mm-dd'});
++});
++//--></script> 
++<script type="text/javascript"><!--
++$('#form input').keydown(function(e) {
++	if (e.keyCode == 13) {
++		filter();
++	}
++});
++//--></script> 
++<?php echo $footer; ?>
+\ No newline at end of file
+diff -x '*.idea*' -Nrup opencart-base-backup/admin/view/template/shipping/easypack24.tpl opencart-base-patched-backup/admin/view/template/shipping/easypack24.tpl
+--- opencart-base-backup/admin/view/template/shipping/easypack24.tpl	1970-01-01 01:00:00.000000000 +0100
++++ opencart-base-patched-backup/admin/view/template/shipping/easypack24.tpl	2013-04-22 15:42:44.690258981 +0200
+@@ -0,0 +1,94 @@
++<?php echo $header; ?>
++<div id="content">
++  <div class="breadcrumb">
++    <?php foreach ($breadcrumbs as $breadcrumb) { ?>
++    <?php echo $breadcrumb['separator']; ?><a href="<?php echo $breadcrumb['href']; ?>"><?php echo $breadcrumb['text']; ?></a>
++    <?php } ?>
++  </div>
++  <?php if ($error_warning) { ?>
++  <div class="warning"><?php echo $error_warning; ?></div>
++  <?php } ?>
++  <div class="box">
++    <div class="heading">
++      <h1><img src="view/image/shipping.png" alt="" /> <?php echo $heading_title; ?></h1>
++      <div class="buttons"><a onclick="$('#form').submit();" class="button"><?php echo $button_save; ?></a><a href="<?php echo $cancel; ?>" class="button"><?php echo $button_cancel; ?></a></div>
++    </div>
++    <div class="content">
++      <form action="<?php echo $action; ?>" method="post" enctype="multipart/form-data" id="form">
++        <table class="form">
++          <tr>
++            <td><?php echo $entry_api_url; ?></td>
++            <td><input type="text" name="easypack24_api_url" value="<?php echo $easypack24_api_url; ?>" /></td>
++          </tr>
++          <tr>
++            <td><?php echo $entry_api_key; ?></td>
++            <td><input type="text" name="easypack24_api_key" value="<?php echo $easypack24_api_key; ?>" /></td>
++          </tr>
++          <tr>
++            <td><?php echo $entry_price; ?></td>
++            <td><input type="text" name="easypack24_price" value="<?php echo $easypack24_price; ?>" /></td>
++          </tr>
++          <tr>
++            <td><?php echo $entry_max_weight; ?></td>
++            <td><input type="text" name="easypack24_max_weight" value="<?php echo $easypack24_max_weight; ?>" /></td>
++          </tr>
++          <tr>
++            <td><?php echo $entry_max_dimension_a; ?></td>
++            <td><input type="text" name="easypack24_max_dimension_a" value="<?php echo $easypack24_max_dimension_a; ?>" /></td>
++          </tr>
++          <tr>
++            <td><?php echo $entry_max_dimension_b; ?></td>
++            <td><input type="text" name="easypack24_max_dimension_b" value="<?php echo $easypack24_max_dimension_b; ?>" /></td>
++          </tr>
++          <tr>
++            <td><?php echo $entry_max_dimension_c; ?></td>
++            <td><input type="text" name="easypack24_max_dimension_c" value="<?php echo $easypack24_max_dimension_c; ?>" /></td>
++          </tr>
++          <tr>
++            <td><?php echo $entry_tax_class; ?></td>
++            <td><select name="easypack24_tax_class_id">
++                <option value="0"><?php echo $text_none; ?></option>
++                <?php foreach ($tax_classes as $tax_class) { ?>
++                <?php if ($tax_class['tax_class_id'] == $easypack24_tax_class_id) { ?>
++                <option value="<?php echo $tax_class['tax_class_id']; ?>" selected="selected"><?php echo $tax_class['title']; ?></option>
++                <?php } else { ?>
++                <option value="<?php echo $tax_class['tax_class_id']; ?>"><?php echo $tax_class['title']; ?></option>
++                <?php } ?>
++                <?php } ?>
++            </select></td>
++          </tr>
++          <tr>
++            <td><?php echo $entry_geo_zone; ?></td>
++            <td><select name="easypack24_geo_zone_id">
++                <option value="0"><?php echo $text_all_zones; ?></option>
++                <?php foreach ($geo_zones as $geo_zone) { ?>
++                <?php if ($geo_zone['geo_zone_id'] == $easypack24_geo_zone_id) { ?>
++                <option value="<?php echo $geo_zone['geo_zone_id']; ?>" selected="selected"><?php echo $geo_zone['name']; ?></option>
++                <?php } else { ?>
++                <option value="<?php echo $geo_zone['geo_zone_id']; ?>"><?php echo $geo_zone['name']; ?></option>
++                <?php } ?>
++                <?php } ?>
++              </select></td>
++          </tr>
++          <tr>
++            <td><?php echo $entry_status; ?></td>
++            <td><select name="easypack24_status">
++                <?php if ($easypack24_status) { ?>
++                <option value="1" selected="selected"><?php echo $text_enabled; ?></option>
++                <option value="0"><?php echo $text_disabled; ?></option>
++                <?php } else { ?>
++                <option value="1"><?php echo $text_enabled; ?></option>
++                <option value="0" selected="selected"><?php echo $text_disabled; ?></option>
++                <?php } ?>
++              </select></td>
++          </tr>
++          <tr>
++            <td><?php echo $entry_sort_order; ?></td>
++            <td><input type="text" name="easypack24_sort_order" value="<?php echo $easypack24_sort_order; ?>" size="1" /></td>
++          </tr>
++        </table>
++      </form>
++    </div>
++  </div>
++</div>
++<?php echo $footer; ?> 
+\ No newline at end of file
+diff -x '*.idea*' -Nrup opencart-base-backup/catalog/controller/checkout/confirm.php opencart-base-patched-backup/catalog/controller/checkout/confirm.php
 --- opencart-base-backup/catalog/controller/checkout/confirm.php	2013-03-18 14:54:53.150900534 +0100
-+++ opencart-base-patched-backup/catalog/controller/checkout/confirm.php	2013-03-18 15:10:16.750912635 +0100
-@@ -198,7 +198,20 @@ class ControllerCheckoutConfirm extends
++++ opencart-base-patched-backup/catalog/controller/checkout/confirm.php	2013-04-22 15:42:44.682258981 +0200
+@@ -198,7 +198,21 @@ class ControllerCheckoutConfirm extends
  					$data['shipping_code'] = $this->session->data['shipping_method']['code'];
  				} else {
  					$data['shipping_code'] = '';
@@ -75,24 +1172,130 @@ diff -rupN opencart-base-backup/catalog/controller/checkout/confirm.php opencart
 +                    $data['shipping_country'] = '';
 +                    $data['shipping_country_id'] = '';
 +                    $data['shipping_address_format'] = '';
++                    $data['easypack24_parcel_size'] = $this->session->data['easypack24_parcel_size'];
 +                }
  			} else {
  				$data['shipping_firstname'] = '';
  				$data['shipping_lastname'] = '';	
-diff -rupN opencart-base-backup/catalog/controller/checkout/shipping_method.php opencart-base-patched-backup/catalog/controller/checkout/shipping_method.php
+diff -x '*.idea*' -Nrup opencart-base-backup/catalog/controller/checkout/shipping_method.php opencart-base-patched-backup/catalog/controller/checkout/shipping_method.php
 --- opencart-base-backup/catalog/controller/checkout/shipping_method.php	2013-03-18 14:54:53.150900534 +0100
-+++ opencart-base-patched-backup/catalog/controller/checkout/shipping_method.php	2013-03-18 15:51:04.578944706 +0100
-@@ -75,6 +75,8 @@ class ControllerCheckoutShippingMethod e
++++ opencart-base-patched-backup/catalog/controller/checkout/shipping_method.php	2013-04-22 15:42:44.682258981 +0200
+@@ -1,158 +1,252 @@
+-<?php 
++<?php
+ class ControllerCheckoutShippingMethod extends Controller {
+   	public function index() {
+ 		$this->language->load('checkout/checkout');
+-		
++
+ 		$this->load->model('account/address');
+-		
+-		if ($this->customer->isLogged() && isset($this->session->data['shipping_address_id'])) {					
+-			$shipping_address = $this->model_account_address->getAddress($this->session->data['shipping_address_id']);		
++
++		if ($this->customer->isLogged() && isset($this->session->data['shipping_address_id'])) {
++			$shipping_address = $this->model_account_address->getAddress($this->session->data['shipping_address_id']);
+ 		} elseif (isset($this->session->data['guest'])) {
+ 			$shipping_address = $this->session->data['guest']['shipping'];
+ 		}
+-		
++
+ 		if (!empty($shipping_address)) {
+ 			// Shipping Methods
+ 			$quote_data = array();
+-			
++
+ 			$this->load->model('setting/extension');
+-			
++
+ 			$results = $this->model_setting_extension->getExtensions('shipping');
+-			
++
+ 			foreach ($results as $result) {
+ 				if ($this->config->get($result['code'] . '_status')) {
+ 					$this->load->model('shipping/' . $result['code']);
+-					
+-					$quote = $this->{'model_shipping_' . $result['code']}->getQuote($shipping_address); 
+-		
++
++					$quote = $this->{'model_shipping_' . $result['code']}->getQuote($shipping_address);
++
+ 					if ($quote) {
+-						$quote_data[$result['code']] = array( 
++						$quote_data[$result['code']] = array(
+ 							'title'      => $quote['title'],
+-							'quote'      => $quote['quote'], 
++							'quote'      => $quote['quote'],
+ 							'sort_order' => $quote['sort_order'],
+ 							'error'      => $quote['error']
+ 						);
+ 					}
+ 				}
+ 			}
+-	
++
+ 			$sort_order = array();
+-		  
++
+ 			foreach ($quote_data as $key => $value) {
+ 				$sort_order[$key] = $value['sort_order'];
+ 			}
+-	
++
+ 			array_multisort($sort_order, SORT_ASC, $quote_data);
+-			
++
+ 			$this->session->data['shipping_methods'] = $quote_data;
+ 		}
+-					
++
+ 		$this->data['text_shipping_method'] = $this->language->get('text_shipping_method');
+ 		$this->data['text_comments'] = $this->language->get('text_comments');
+-	
++
+ 		$this->data['button_continue'] = $this->language->get('button_continue');
+-		
++
+ 		if (empty($this->session->data['shipping_methods'])) {
+ 			$this->data['error_warning'] = sprintf($this->language->get('error_no_shipping'), $this->url->link('information/contact'));
+ 		} else {
+ 			$this->data['error_warning'] = '';
+-		}	
+-					
++		}
++
+ 		if (isset($this->session->data['shipping_methods'])) {
+-			$this->data['shipping_methods'] = $this->session->data['shipping_methods']; 
++			$this->data['shipping_methods'] = $this->session->data['shipping_methods'];
+ 		} else {
+ 			$this->data['shipping_methods'] = array();
+ 		}
+-		
++
+ 		if (isset($this->session->data['shipping_method']['code'])) {
+ 			$this->data['code'] = $this->session->data['shipping_method']['code'];
+ 		} else {
+ 			$this->data['code'] = '';
+ 		}
+-		
++
+ 		if (isset($this->session->data['comment'])) {
+ 			$this->data['comment'] = $this->session->data['comment'];
  		} else {
  			$this->data['comment'] = '';
  		}
+-			
+-		if (file_exists(DIR_TEMPLATE . $this->config->get('config_template') . '/template/checkout/shipping_method.tpl')) {
 +
 +        $this->prepareDataForEasypack24();
- 			
- 		if (file_exists(DIR_TEMPLATE . $this->config->get('config_template') . '/template/checkout/shipping_method.tpl')) {
++
++        if (file_exists(DIR_TEMPLATE . $this->config->get('config_template') . '/template/checkout/shipping_method.tpl')) {
  			$this->template = $this->config->get('config_template') . '/template/checkout/shipping_method.tpl';
-@@ -84,8 +86,68 @@ class ControllerCheckoutShippingMethod e
- 		
+ 		} else {
+ 			$this->template = 'default/template/checkout/shipping_method.tpl';
+ 		}
+-		
++
  		$this->response->setOutput($this->render());
    	}
 -	
@@ -100,19 +1303,16 @@ diff -rupN opencart-base-backup/catalog/controller/checkout/shipping_method.php 
 +
 +    public function prepareDataForEasypack24()
 +    {
-+        $allMachines = $this->easypack24_helper->connectEasypack24(
-+            array(
-+                'url' => $this->config->get('easypack24_api_url') . 'machines',
-+                'methodType' => 'GET',
-+                'params' => array()
-+            )
-+        );
++        $apiUrl = $this->config->get('easypack24_api_url');
++        $apiKey = $this->config->get('easypack24_api_key');
++        $allMachines = $this->easypack24_helper->getBoxMachines($apiKey, $apiUrl);
 +
 +        if (empty($this->session->data['shipping_address_id'])) {
 +            $city = $this->session->data['guest']['shipping']['city'];
 +            $phone = $this->session->data['guest']['telephone'];
 +        } else {
-+            $city = $this->model_account_address->getAddress($this->session->data['shipping_address_id'])['city'];
++            $city = $this->model_account_address->getAddress($this->session->data['shipping_address_id']);
++            $city = $city['city'];
 +            $phone = $this->customer->getTelephone();
 +        }
 +
@@ -160,12 +1360,73 @@ diff -rupN opencart-base-backup/catalog/controller/checkout/shipping_method.php 
 +
 +    public function validate() {
  		$this->language->load('checkout/checkout');
- 		
- 		$json = array();		
-@@ -131,6 +193,19 @@ class ControllerCheckoutShippingMethod e
- 				break;
- 			}				
+-		
+-		$json = array();		
+-		
++
++		$json = array();
++
+ 		// Validate if shipping is required. If not the customer should not have reached this page.
+ 		if (!$this->cart->hasShipping()) {
+ 			$json['redirect'] = $this->url->link('checkout/checkout', '', 'SSL');
  		}
+-		
+-		// Validate if shipping address has been set.		
++
++		// Validate if shipping address has been set.
+ 		$this->load->model('account/address');
+ 
+-		if ($this->customer->isLogged() && isset($this->session->data['shipping_address_id'])) {					
+-			$shipping_address = $this->model_account_address->getAddress($this->session->data['shipping_address_id']);		
++		if ($this->customer->isLogged() && isset($this->session->data['shipping_address_id'])) {
++			$shipping_address = $this->model_account_address->getAddress($this->session->data['shipping_address_id']);
+ 		} elseif (isset($this->session->data['guest'])) {
+ 			$shipping_address = $this->session->data['guest']['shipping'];
+ 		}
+-		
+-		if (empty($shipping_address)) {								
++
++		if (empty($shipping_address)) {
+ 			$json['redirect'] = $this->url->link('checkout/checkout', '', 'SSL');
+ 		}
+-		
+-		// Validate cart has products and has stock.	
++
++		// Validate cart has products and has stock.
+ 		if ((!$this->cart->hasProducts() && empty($this->session->data['vouchers'])) || (!$this->cart->hasStock() && !$this->config->get('config_stock_checkout'))) {
+-			$json['redirect'] = $this->url->link('checkout/cart');				
+-		}	
+-		
+-		// Validate minimum quantity requirments.			
++			$json['redirect'] = $this->url->link('checkout/cart');
++		}
++
++		// Validate minimum quantity requirments.
+ 		$products = $this->cart->getProducts();
+-				
++
+ 		foreach ($products as $product) {
+ 			$product_total = 0;
+-				
++
+ 			foreach ($products as $product_2) {
+ 				if ($product_2['product_id'] == $product['product_id']) {
+ 					$product_total += $product_2['quantity'];
+ 				}
+-			}		
+-			
++			}
++
+ 			if ($product['minimum'] > $product_total) {
+ 				$json['redirect'] = $this->url->link('checkout/cart');
+-				
++
+ 				break;
+-			}				
++			}
+ 		}
+-				
+-		if (!$json) {
 +
 +        // Validate data for easypack24 shipment method
 +        if ($this->request->post['shipping_method'] == 'easypack24.easypack24') {
@@ -179,13 +1440,44 @@ diff -rupN opencart-base-backup/catalog/controller/checkout/shipping_method.php 
 +                $json['error']['warning'] = 'No target machine selected';
 +            }
 +        }
- 				
- 		if (!$json) {
++
++        if (!$json) {
  			if (!isset($this->request->post['shipping_method'])) {
-@@ -149,10 +224,18 @@ class ControllerCheckoutShippingMethod e
+ 				$json['error']['warning'] = $this->language->get('error_shipping');
+ 			} else {
+ 				$shipping = explode('.', $this->request->post['shipping_method']);
+-					
+-				if (!isset($shipping[0]) || !isset($shipping[1]) || !isset($this->session->data['shipping_methods'][$shipping[0]]['quote'][$shipping[1]])) {			
++
++				if (!isset($shipping[0]) || !isset($shipping[1]) || !isset($this->session->data['shipping_methods'][$shipping[0]]['quote'][$shipping[1]])) {
+ 					$json['error']['warning'] = $this->language->get('error_shipping');
+ 				}
+ 			}
+-			
++
+ 			if (!$json) {
+ 				$shipping = explode('.', $this->request->post['shipping_method']);
+-					
++
  				$this->session->data['shipping_method'] = $this->session->data['shipping_methods'][$shipping[0]]['quote'][$shipping[1]];
- 				
+-				
++
  				$this->session->data['comment'] = strip_tags($this->request->post['comment']);
+-			}							
++
++                $max_dimension_a = $this->config->get('easypack24_max_dimension_a');
++                $max_dimension_b = $this->config->get('easypack24_max_dimension_b');
++                $max_dimension_c = $this->config->get('easypack24_max_dimension_c');
++                $product_dimensions = array();
++                foreach ($this->cart->getProducts() as $product) {
++                    if ($product['shipping']) {
++                        $length = $this->length->convert($product['length'], $product['length_class_id'], $this->config->get('config_length_class_id'));
++                        $width = $this->width;
++                        $height = $this->height;
++                        array_push($product_dimensions, array('width' => $width, 'height' => $height, 'depth' => $length));
++                    }
++                }
++                $parcelSize = $this->easypack24_helper->calculateParcelSize($product_dimensions, $max_dimension_a, $max_dimension_b, $max_dimension_c);
 +
 +                $all_machines = $this->session->data['easypack24_all_machines'];
 +                $machine = $all_machines[$this->request->post['easypack24_machine_id']];
@@ -193,17 +1485,134 @@ diff -rupN opencart-base-backup/catalog/controller/checkout/shipping_method.php 
 +                $this->session->data['easypack24_shipping_address_2'] = $machine['address']['street'] . ' ' . $machine['address']['building_number'] . ' ' . $machine['address']['flat_number'];
 +                $this->session->data['easypack24_shipping_city'] = $machine['address']['city'];
 +                $this->session->data['easypack24_shipping_postcode'] = $machine['address']['postcode'];
-+                unset($this->session->data['easypack24_all_machines']);
- 			}							
++                $this->session->data['easypack24_parcel_size'] = $parcelSize['parcelSize'];
++			}
  		}
- 		
- 		$this->response->setOutput(json_encode($json));	
+-		
+-		$this->response->setOutput(json_encode($json));	
++
++		$this->response->setOutput(json_encode($json));
  	}
  }
--?>
+ ?>
 \ No newline at end of file
+diff -x '*.idea*' -Nrup opencart-base-backup/catalog/language/english/shipping/easypack24.php opencart-base-patched-backup/catalog/language/english/shipping/easypack24.php
+--- opencart-base-backup/catalog/language/english/shipping/easypack24.php	1970-01-01 01:00:00.000000000 +0100
++++ opencart-base-patched-backup/catalog/language/english/shipping/easypack24.php	2013-04-22 15:42:44.682258981 +0200
+@@ -0,0 +1,10 @@
++<?php
++// Text
++$_['text_title'] = 'InPost Parcel Lockers 24/7';
++$_['text_description'] = 'InPost Parcel Lockers 24/7';
++$_['text_select_machine'] = 'Select Machine...';
++$_['text_no_machines'] = 'No terminals in your city';
++$_['error_max_weight'] = 'Max weight exceeded or no weight set for chosen items . Weight limit is: ';
++$_['error_max_dimension'] = 'Max dimension exceeded or no dimension set for chosen items . Dimension limit is: ';
++$_['label_receiver_phone'] = 'Mobile e.g. 523045856';
 +?>
-diff -rupN opencart-base-backup/catalog/model/total/shipping.php opencart-base-patched-backup/catalog/model/total/shipping.php
+\ No newline at end of file
+diff -x '*.idea*' -Nrup opencart-base-backup/catalog/model/checkout/order.php opencart-base-patched-backup/catalog/model/checkout/order.php
+--- opencart-base-backup/catalog/model/checkout/order.php	2013-03-18 14:54:53.154900534 +0100
++++ opencart-base-patched-backup/catalog/model/checkout/order.php	2013-04-22 15:42:44.686258981 +0200
+@@ -1,7 +1,7 @@
+ <?php
+ class ModelCheckoutOrder extends Model {	
+ 	public function addOrder($data) {
+-		$this->db->query("INSERT INTO `" . DB_PREFIX . "order` SET invoice_prefix = '" . $this->db->escape($data['invoice_prefix']) . "', store_id = '" . (int)$data['store_id'] . "', store_name = '" . $this->db->escape($data['store_name']) . "', store_url = '" . $this->db->escape($data['store_url']) . "', customer_id = '" . (int)$data['customer_id'] . "', customer_group_id = '" . (int)$data['customer_group_id'] . "', firstname = '" . $this->db->escape($data['firstname']) . "', lastname = '" . $this->db->escape($data['lastname']) . "', email = '" . $this->db->escape($data['email']) . "', telephone = '" . $this->db->escape($data['telephone']) . "', fax = '" . $this->db->escape($data['fax']) . "', payment_firstname = '" . $this->db->escape($data['payment_firstname']) . "', payment_lastname = '" . $this->db->escape($data['payment_lastname']) . "', payment_company = '" . $this->db->escape($data['payment_company']) . "', payment_company_id = '" . $this->db->escape($data['payment_company_id']) . "', payment_tax_id = '" . $this->db->escape($data['payment_tax_id']) . "', payment_address_1 = '" . $this->db->escape($data['payment_address_1']) . "', payment_address_2 = '" . $this->db->escape($data['payment_address_2']) . "', payment_city = '" . $this->db->escape($data['payment_city']) . "', payment_postcode = '" . $this->db->escape($data['payment_postcode']) . "', payment_country = '" . $this->db->escape($data['payment_country']) . "', payment_country_id = '" . (int)$data['payment_country_id'] . "', payment_zone = '" . $this->db->escape($data['payment_zone']) . "', payment_zone_id = '" . (int)$data['payment_zone_id'] . "', payment_address_format = '" . $this->db->escape($data['payment_address_format']) . "', payment_method = '" . $this->db->escape($data['payment_method']) . "', payment_code = '" . $this->db->escape($data['payment_code']) . "', shipping_firstname = '" . $this->db->escape($data['shipping_firstname']) . "', shipping_lastname = '" . $this->db->escape($data['shipping_lastname']) . "', shipping_company = '" . $this->db->escape($data['shipping_company']) . "', shipping_address_1 = '" . $this->db->escape($data['shipping_address_1']) . "', shipping_address_2 = '" . $this->db->escape($data['shipping_address_2']) . "', shipping_city = '" . $this->db->escape($data['shipping_city']) . "', shipping_postcode = '" . $this->db->escape($data['shipping_postcode']) . "', shipping_country = '" . $this->db->escape($data['shipping_country']) . "', shipping_country_id = '" . (int)$data['shipping_country_id'] . "', shipping_zone = '" . $this->db->escape($data['shipping_zone']) . "', shipping_zone_id = '" . (int)$data['shipping_zone_id'] . "', shipping_address_format = '" . $this->db->escape($data['shipping_address_format']) . "', shipping_method = '" . $this->db->escape($data['shipping_method']) . "', shipping_code = '" . $this->db->escape($data['shipping_code']) . "', comment = '" . $this->db->escape($data['comment']) . "', total = '" . (float)$data['total'] . "', affiliate_id = '" . (int)$data['affiliate_id'] . "', commission = '" . (float)$data['commission'] . "', language_id = '" . (int)$data['language_id'] . "', currency_id = '" . (int)$data['currency_id'] . "', currency_code = '" . $this->db->escape($data['currency_code']) . "', currency_value = '" . (float)$data['currency_value'] . "', ip = '" . $this->db->escape($data['ip']) . "', forwarded_ip = '" .  $this->db->escape($data['forwarded_ip']) . "', user_agent = '" . $this->db->escape($data['user_agent']) . "', accept_language = '" . $this->db->escape($data['accept_language']) . "', date_added = NOW(), date_modified = NOW()");
++		$this->db->query("INSERT INTO `" . DB_PREFIX . "order` SET invoice_prefix = '" . $this->db->escape($data['invoice_prefix']) . "', store_id = '" . (int)$data['store_id'] . "', store_name = '" . $this->db->escape($data['store_name']) . "', store_url = '" . $this->db->escape($data['store_url']) . "', customer_id = '" . (int)$data['customer_id'] . "', customer_group_id = '" . (int)$data['customer_group_id'] . "', firstname = '" . $this->db->escape($data['firstname']) . "', lastname = '" . $this->db->escape($data['lastname']) . "', email = '" . $this->db->escape($data['email']) . "', telephone = '" . $this->db->escape($data['telephone']) . "', fax = '" . $this->db->escape($data['fax']) . "', payment_firstname = '" . $this->db->escape($data['payment_firstname']) . "', payment_lastname = '" . $this->db->escape($data['payment_lastname']) . "', payment_company = '" . $this->db->escape($data['payment_company']) . "', payment_company_id = '" . $this->db->escape($data['payment_company_id']) . "', payment_tax_id = '" . $this->db->escape($data['payment_tax_id']) . "', payment_address_1 = '" . $this->db->escape($data['payment_address_1']) . "', payment_address_2 = '" . $this->db->escape($data['payment_address_2']) . "', payment_city = '" . $this->db->escape($data['payment_city']) . "', payment_postcode = '" . $this->db->escape($data['payment_postcode']) . "', payment_country = '" . $this->db->escape($data['payment_country']) . "', payment_country_id = '" . (int)$data['payment_country_id'] . "', payment_zone = '" . $this->db->escape($data['payment_zone']) . "', payment_zone_id = '" . (int)$data['payment_zone_id'] . "', payment_address_format = '" . $this->db->escape($data['payment_address_format']) . "', payment_method = '" . $this->db->escape($data['payment_method']) . "', payment_code = '" . $this->db->escape($data['payment_code']) . "', shipping_firstname = '" . $this->db->escape($data['shipping_firstname']) . "', shipping_lastname = '" . $this->db->escape($data['shipping_lastname']) . "', shipping_company = '" . $this->db->escape($data['shipping_company']) . "', shipping_address_1 = '" . $this->db->escape($data['shipping_address_1']) . "', shipping_address_2 = '" . $this->db->escape($data['shipping_address_2']) . "', shipping_city = '" . $this->db->escape($data['shipping_city']) . "', shipping_postcode = '" . $this->db->escape($data['shipping_postcode']) . "', shipping_country = '" . $this->db->escape($data['shipping_country']) . "', shipping_country_id = '" . (int)$data['shipping_country_id'] . "', shipping_zone = '" . $this->db->escape($data['shipping_zone']) . "', shipping_zone_id = '" . (int)$data['shipping_zone_id'] . "', shipping_address_format = '" . $this->db->escape($data['shipping_address_format']) . "', shipping_method = '" . $this->db->escape($data['shipping_method']) . "', shipping_code = '" . $this->db->escape($data['shipping_code']) . "', comment = '" . $this->db->escape($data['comment']) . "', total = '" . (float)$data['total'] . "', affiliate_id = '" . (int)$data['affiliate_id'] . "', commission = '" . (float)$data['commission'] . "', language_id = '" . (int)$data['language_id'] . "', currency_id = '" . (int)$data['currency_id'] . "', currency_code = '" . $this->db->escape($data['currency_code']) . "', currency_value = '" . (float)$data['currency_value'] . "', ip = '" . $this->db->escape($data['ip']) . "', forwarded_ip = '" .  $this->db->escape($data['forwarded_ip']) . "', user_agent = '" . $this->db->escape($data['user_agent']) . "', accept_language = '" . $this->db->escape($data['accept_language']) . "', easypack24_parcel_size = '" . $this->db->escape($data['easypack24_parcel_size']) .  "', date_added = NOW(), date_modified = NOW()");
+ 
+ 		$order_id = $this->db->getLastId();
+ 
+@@ -158,7 +158,7 @@ class ModelCheckoutOrder extends Model {
+ 
+ 	public function confirm($order_id, $order_status_id, $comment = '', $notify = false) {
+ 		$order_info = $this->getOrder($order_id);
+-		 
++
+ 		if ($order_info && !$order_info['order_status_id']) {
+ 			// Fraud Detection
+ 			if ($this->config->get('config_fraud_detection')) {
+diff -x '*.idea*' -Nrup opencart-base-backup/catalog/model/shipping/easypack24.php opencart-base-patched-backup/catalog/model/shipping/easypack24.php
+--- opencart-base-backup/catalog/model/shipping/easypack24.php	1970-01-01 01:00:00.000000000 +0100
++++ opencart-base-patched-backup/catalog/model/shipping/easypack24.php	2013-04-22 15:42:44.686258981 +0200
+@@ -0,0 +1,75 @@
++<?php
++class ModelShippingEasypack24 extends Model
++{
++    function getQuote($address)
++    {
++        $this->language->load('shipping/easypack24');
++
++        $query = $this->db->query("SELECT * FROM " . DB_PREFIX . "zone_to_geo_zone WHERE geo_zone_id = '" . (int)$this->config->get('easypack24_geo_zone_id') . "' AND country_id = '" . (int)$address['country_id'] . "' AND (zone_id = '" . (int)$address['zone_id'] . "' OR zone_id = '0')");
++
++        if (!$this->config->get('easypack24_geo_zone_id')) {
++            $status = true;
++        } elseif ($query->num_rows) {
++            $status = true;
++        } else {
++            $status = false;
++        }
++
++        // check size - check weight code as well, it can be in LBS, not KG
++        $weight = $this->cart->getWeight();
++        $max_weight = $this->config->get('easypack24_max_weight');
++
++        $error = false;
++        if (!$weight || $weight <= 0 || $weight > $max_weight) {
++            $error = $this->language->get('error_max_weight') . $max_weight;
++        }
++
++        $dimension = 0;
++        foreach ($this->cart->getProducts() as $product) {
++            if ($product['shipping']) {
++                $length = $this->length->convert($product['length'], $product['length_class_id'], $this->config->get('config_length_class_id'));
++                $width = $this->width;
++                $height = $this->height;
++                $dimension = $length + $width + $height;
++            }
++        }
++
++        $max_dimension_c = $this->config->get('easypack24_max_dimension_c');
++
++        $max_dimension_array = explode('x', strtolower(trim($max_dimension_c)));
++        $max_length = (float)trim($max_dimension_array[0]);
++        $max_width = (float)trim($max_dimension_array[1]);
++        $max_height = (float)trim($max_dimension_array[2]);
++        $max_dimension = $max_length + $max_width + $max_height;
++
++        if ($dimension > $max_dimension) {
++            $error = $this->language->get('error_max_dimension') . $max_dimension_c;
++        }
++
++
++        $method_data = array();
++
++        if ($status) {
++            $quote_data = array();
++
++            $quote_data['easypack24'] = array(
++                'code' => 'easypack24.easypack24',
++                'title' => $this->language->get('text_description'),
++                'cost' => $this->config->get('easypack24_price'),
++                'text' => $this->currency->format($this->config->get('easypack24_price'))
++            );
++
++            $method_data = array(
++                'code' => 'easypack24',
++                'title' => $this->language->get('text_title'),
++                'quote' => $quote_data,
++                'sort_order' => $this->config->get('easypack24_sort_order'),
++                'error' => $error
++            );
++        }
++
++        return $method_data;
++    }
++}
++
++?>
+\ No newline at end of file
+diff -x '*.idea*' -Nrup opencart-base-backup/catalog/model/total/shipping.php opencart-base-patched-backup/catalog/model/total/shipping.php
 --- opencart-base-backup/catalog/model/total/shipping.php	2013-03-18 14:54:53.154900534 +0100
 +++ opencart-base-patched-backup/catalog/model/total/shipping.php	2013-03-18 15:10:16.754912635 +0100
 @@ -10,7 +10,7 @@ class ModelTotalShipping extends Model {
@@ -215,7 +1624,7 @@ diff -rupN opencart-base-backup/catalog/model/total/shipping.php opencart-base-p
  				$tax_rates = $this->tax->getRates($this->session->data['shipping_method']['cost'], $this->session->data['shipping_method']['tax_class_id']);
  				
  				foreach ($tax_rates as $tax_rate) {
-diff -rupN opencart-base-backup/catalog/view/theme/default/template/checkout/checkout.tpl opencart-base-patched-backup/catalog/view/theme/default/template/checkout/checkout.tpl
+diff -x '*.idea*' -Nrup opencart-base-backup/catalog/view/theme/default/template/checkout/checkout.tpl opencart-base-patched-backup/catalog/view/theme/default/template/checkout/checkout.tpl
 --- opencart-base-backup/catalog/view/theme/default/template/checkout/checkout.tpl	2013-03-18 14:54:53.154900534 +0100
 +++ opencart-base-patched-backup/catalog/view/theme/default/template/checkout/checkout.tpl	2013-03-18 15:10:16.758912634 +0100
 @@ -825,7 +825,7 @@ $('#button-shipping-method').live('click
@@ -227,9 +1636,9 @@ diff -rupN opencart-base-backup/catalog/view/theme/default/template/checkout/che
  		dataType: 'json',
  		beforeSend: function() {
  			$('#button-shipping-method').attr('disabled', true);
-diff -rupN opencart-base-backup/catalog/view/theme/default/template/checkout/shipping_method.tpl opencart-base-patched-backup/catalog/view/theme/default/template/checkout/shipping_method.tpl
+diff -x '*.idea*' -Nrup opencart-base-backup/catalog/view/theme/default/template/checkout/shipping_method.tpl opencart-base-patched-backup/catalog/view/theme/default/template/checkout/shipping_method.tpl
 --- opencart-base-backup/catalog/view/theme/default/template/checkout/shipping_method.tpl	2013-03-18 14:54:53.154900534 +0100
-+++ opencart-base-patched-backup/catalog/view/theme/default/template/checkout/shipping_method.tpl	2013-03-18 15:10:16.758912634 +0100
++++ opencart-base-patched-backup/catalog/view/theme/default/template/checkout/shipping_method.tpl	2013-04-22 15:42:44.686258981 +0200
 @@ -1,3 +1,29 @@
 +<script type="text/javascript">
 +    function map_callback(value) {
@@ -260,10 +1669,12 @@ diff -rupN opencart-base-backup/catalog/view/theme/default/template/checkout/shi
  <?php if ($error_warning) { ?>
  <div class="warning"><?php echo $error_warning; ?></div>
  <?php } ?>
-@@ -20,6 +46,57 @@
+@@ -20,7 +46,61 @@
      <td><label for="<?php echo $quote['code']; ?>"><?php echo $quote['title']; ?></label></td>
      <td style="text-align: right;"><label for="<?php echo $quote['code']; ?>"><?php echo $quote['text']; ?></label></td>
    </tr>
+-  <?php } ?>
++
 +    <?php if ($quote['code'] == 'easypack24.easypack24') { ?>
 +    <tr class="highlight" id="shipping-easypack24">
 +        <td>&nbsp;</td>
@@ -285,6 +1696,7 @@ diff -rupN opencart-base-backup/catalog/view/theme/default/template/checkout/shi
 +        </td>
 +        <td>&nbsp;</td>
 +    </tr>
++
 +    <script type="text/javascript">
 +        $(document).ready(function(){
 +            $('input[type="checkbox"][name="show_all_machines"]').click(function(){
@@ -293,15 +1705,15 @@ diff -rupN opencart-base-backup/catalog/view/theme/default/template/checkout/shi
 +                    var machines = {
 +                        '' : 'Select Machine..',
 +                            <?php foreach($parcelTargetAllMachinesId as $key => $parcelTargetAllMachineId) { ?>
-+                        '<?php echo $key ?>' : '<?php echo addslashes($parcelTargetAllMachineId) ?>',
-+                    <?php } ?>
++                    '<?php echo $key ?>' : '<?php echo addslashes($parcelTargetAllMachineId) ?>',
++                <?php } ?>
 +                };
 +            }else{
 +                var machines = {
 +                    '' : 'Select Machine..',
 +                        <?php foreach($parcelTargetMachinesId as $key => $parcelTargetMachineId) { ?>
-+                    '<?php echo $key ?>' : '<?php echo addslashes($parcelTargetMachineId) ?>',
-+                <?php } ?>
++                '<?php echo $key ?>' : '<?php echo addslashes($parcelTargetMachineId) ?>',
++            <?php } ?>
 +            };
 +        }
 +
@@ -315,10 +1727,12 @@ diff -rupN opencart-base-backup/catalog/view/theme/default/template/checkout/shi
 +        });
 +    </script>
 +    <?php } ?>
-   <?php } ?>
++
++    <?php } ?>
    <?php } else { ?>
    <tr>
-@@ -39,3 +116,16 @@
+     <td colspan="3"><div class="error"><?php echo $shipping_method['error']; ?></div></td>
+@@ -39,3 +119,16 @@
      <input type="button" value="<?php echo $button_continue; ?>" id="button-shipping-method" class="button" />
    </div>
  </div>
@@ -336,7 +1750,7 @@ diff -rupN opencart-base-backup/catalog/view/theme/default/template/checkout/shi
 +    $('#shipping-easypack24').hide();
 +</script>
 \ No newline at end of file
-diff -rupN opencart-base-backup/index.php opencart-base-patched-backup/index.php
+diff -x '*.idea*' -Nrup opencart-base-backup/index.php opencart-base-patched-backup/index.php
 --- opencart-base-backup/index.php	2013-03-18 14:54:53.102900532 +0100
 +++ opencart-base-patched-backup/index.php	2013-03-18 15:10:16.706912635 +0100
 @@ -213,7 +213,10 @@ $registry->set('cart', new Cart($registr
@@ -351,7 +1765,276 @@ diff -rupN opencart-base-backup/index.php opencart-base-patched-backup/index.php
  // Front Controller 
  $controller = new Front($registry);
  
-diff -rupN opencart-base-backup/system/startup.php opencart-base-patched-backup/system/startup.php
+diff -x '*.idea*' -Nrup opencart-base-backup/system/library/easypack24.php opencart-base-patched-backup/system/library/easypack24.php
+--- opencart-base-backup/system/library/easypack24.php	1970-01-01 01:00:00.000000000 +0100
++++ opencart-base-patched-backup/system/library/easypack24.php	2013-04-22 15:42:44.690258981 +0200
+@@ -0,0 +1,264 @@
++<?php
++
++class Easypack24HelperData
++{
++    private $integrationId = 'opencart-1.x';
++    private $description = 'opencart-1.x';
++
++    private function sendRequest($apiKey, $params = array())
++    {
++        $params['params']['description2'] = $this->integrationId;
++        $params = array_merge(
++            array(
++                'url' => $params['url'],
++                'token' => $apiKey,
++                'methodType' => $params['methodType'],
++                'params' => $params['params']
++            ),
++            $params
++        );
++
++        $ch = curl_init();
++
++        switch ($params['methodType']) {
++            case 'GET':
++                curl_setopt($ch, CURLOPT_HTTPHEADER, array('X-HTTP-Method-Override: GET'));
++                $getParams = null;
++                if (!empty($params['params'])) {
++                    foreach ($params['params'] as $field_name => $field_value) {
++                        $getParams .= $field_name . '=' . urlencode($field_value) . '&';
++                    }
++                    curl_setopt($ch, CURLOPT_URL, $params['url'] . '?token=' . $params['token'] . '&' . $getParams);
++                } else {
++                    curl_setopt($ch, CURLOPT_URL, $params['url'] . '?token=' . $params['token']);
++                }
++                curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'GET');
++                break;
++            case 'POST':
++                $string = json_encode($params['params']);
++                curl_setopt($ch, CURLOPT_HTTPHEADER, array('X-HTTP-Method-Override: POST'));
++                curl_setopt($ch, CURLOPT_URL, $params['url'] . '?token=' . $params['token']);
++                curl_setopt($ch, CURLOPT_POST, true);
++                curl_setopt($ch, CURLOPT_POSTFIELDS, $string);
++                curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
++                curl_setopt($ch, CURLOPT_HTTPHEADER, array(
++                        'Content-Type: application/json',
++                        'Content-Length: ' . strlen($string))
++                );
++                break;
++            case 'PUT':
++                $string = json_encode($params['params']);
++                curl_setopt($ch, CURLOPT_HTTPHEADER, array('X-HTTP-Method-Override: PUT'));
++                curl_setopt($ch, CURLOPT_URL, $params['url'] . '?token=' . $params['token']);
++                curl_setopt($ch, CURLOPT_POST, true);
++                curl_setopt($ch, CURLOPT_POSTFIELDS, $string);
++                curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PUT');
++                curl_setopt($ch, CURLOPT_HTTPHEADER, array(
++                        'Content-Type: application/json',
++                        'Content-Length: ' . strlen($string))
++                );
++                break;
++        }
++
++        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
++        return array(
++            'result' => json_decode(curl_exec($ch)),
++            'info' => curl_getinfo($ch),
++            'errno' => curl_errno($ch),
++            'error' => curl_error($ch)
++        );
++    }
++
++    public function registerParcel($apiKey, $apiUrl, $phone, $email, $boxMachineName, $parcelSize)
++    {
++        $apiUrl = $this->cleanUrl($apiUrl);
++
++        $response = $this->sendRequest($apiKey,
++            array(
++                'url' => $apiUrl . 'parcels',
++                'methodType' => 'POST',
++                'params' => array(
++                    'receiver' => array(
++                        'phone' => $phone,
++                        'email' => $email
++                    ),
++                    'size' => $parcelSize,
++                    'tmp_id' => '1',
++                    'target_machine' => $boxMachineName,
++                    'description' => $this->description
++                )
++            )
++        );
++
++        if ($response['info']['http_code'] == 201 || $response['info']['http_code'] == 204) {
++            return array('id' => $response['result']->id);
++        } else {
++            return array('error' => 1);
++        }
++    }
++
++    public function refreshParcel($apiKey, $apiUrl, $parcelId)
++    {
++        $apiUrl = $this->cleanUrl($apiUrl);
++
++        $response = $this->sendRequest($apiKey,
++            array(
++                'url' => $apiUrl . 'parcels/' . $parcelId,
++                'methodType' => 'GET',
++                'params' => array()
++            )
++        );
++
++        if ($response['info']['http_code'] == 200) {
++            return array('status' => $response['result']->status,
++                'boxMachineName' => $response['result']->target_machine,
++                'parcelSize' => $response['result']->size);
++        } else {
++            return array('error' => 1);
++        }
++    }
++
++    public function cancelParcel($apiKey, $apiUrl, $parcelId)
++    {
++        $apiUrl = $this->cleanUrl($apiUrl);
++
++        $response = $this->sendRequest($apiKey,
++            array(
++                'url' => $apiUrl . 'parcels',
++                'methodType' => 'PUT',
++                'params' => array(
++                    'id' => $parcelId,
++                    'status' => 'canceled'
++                )
++            )
++        );
++
++        if ($response['info']['http_code'] == 201 || $response['info']['http_code'] == 204) {
++            return array();
++        } else {
++            return array('error' => 1);
++        }
++    }
++
++    public function getSticker($apiKey, $apiUrl, $parcelId)
++    {
++        $apiUrl = $this->cleanUrl($apiUrl);
++
++        $response = $this->sendRequest($apiKey,
++            array(
++                'url' => $apiUrl . 'stickers/' . $parcelId,
++                'methodType' => 'GET',
++                'params' => array(
++                    'format' => 'Pdf',
++                    'type' => 'normal'
++                )
++            )
++        );
++
++        if ($response['info']['http_code'] == 200) {
++            return array('pdf' => base64_decode($response['result']));
++        } else {
++            return array('error' => 1);
++        }
++    }
++
++    public function payForParcel($apiKey, $apiUrl, $parcelId)
++    {
++        $apiUrl = $this->cleanUrl($apiUrl);
++
++        $response = $this->sendRequest($apiKey,
++            array(
++                'url' => $apiUrl . 'parcels/' . $parcelId . '/pay',
++                'methodType' => 'POST',
++                'params' => array()
++            )
++        );
++
++        if ($response['info']['http_code'] == 201 || $response['info']['http_code'] == 204) {
++            return array();
++        } else {
++            return array('error' => 1);
++        }
++    }
++
++    public function getBoxMachines($apiKey, $apiUrl)
++    {
++        $apiUrl = $this->cleanUrl($apiUrl);
++
++        $response = $this->sendRequest($apiKey,
++            array(
++                'url' => $apiUrl . 'machines',
++                'methodType' => 'GET',
++                'params' => array()
++            )
++        );
++
++        return $response;
++    }
++
++    private function dump($response)
++    {
++        echo '<pre>';
++        var_dump($response);
++        echo '</pre>';
++    }
++
++    private function cleanUrl($apiUrl)
++    {
++        if ($apiUrl[strlen($apiUrl) - 1] != '/') {
++            $apiUrl .= '/';
++        }
++        return $apiUrl;
++    }
++
++    public static function calculateParcelSize($productDimensions = array(), $maxDimensionA, $maxDimensionB, $maxDimensionC)
++    {
++        $error = null;
++
++        if (!empty($productDimensions)) {
++            $a = self::explodeDimension($maxDimensionA);
++            $b = self::explodeDimension($maxDimensionB);
++            $c = self::explodeDimension($maxDimensionC);
++
++            if ($c['width'] == 0 || $c['height'] == 0 || $c['depth'] == 0) {
++                $error = 1;
++            }
++
++            $sum = 0;
++            foreach ($productDimensions as $product) {
++                if ($product['width'] > $c['width'] || $product['height'] > $c['height'] || $product['depth'] > $c['depth']) {
++                    $error = 1;
++                }
++
++                $sum += $product['width'] + $product['height'] + $product['depth'];
++                if ($sum > $c['sum']) {
++                    $error = 1;
++                }
++            }
++
++            if ($sum <= $a['sum']) {
++                $parcelSize = 'A';
++            } elseif ($sum <= $b['sum']) {
++                $parcelSize = 'B';
++            } elseif ($sum <= $c['sum']) {
++                $parcelSize = 'C';
++            } else {
++                $error = 1;
++            }
++        }
++
++        return array('parcelSize' => $parcelSize, 'error' => $error);
++    }
++
++    public static function explodeDimension($dimension)
++    {
++        $exploded = explode('x', strtolower(trim($dimension)));
++        $width = (float)trim(@$exploded[0]);
++        $height = (float)trim(@$exploded[1]);
++        $depth = (float)trim(@$exploded[2]);
++        $sum = $width + $height + $depth;
++        return array('sum' => $sum, 'width' => $width, 'height' => $height, 'depth' => $depth);
++    }
++}
++
++?>
+\ No newline at end of file
+diff -x '*.idea*' -Nrup opencart-base-backup/system/startup.php opencart-base-patched-backup/system/startup.php
 --- opencart-base-backup/system/startup.php	2013-03-18 14:54:53.134900534 +0100
 +++ opencart-base-patched-backup/system/startup.php	2013-03-18 15:10:16.742912635 +0100
 @@ -101,4 +101,5 @@ require_once(DIR_SYSTEM . 'library/reque
